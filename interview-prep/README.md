@@ -1,8 +1,8 @@
 # Python / FastAPI + AI & RAG Interview Preparation Master Hub
 
-Target Role: **Staff / Senior Python, FastAPI, Distributed Systems and GenAI/RAG Engineer**  
+Target Role: **Staff / Senior Python, FastAPI, Distributed Systems, GenAI/RAG and Full-Stack Engineer**  
 Candidate Background: **3 Years Full-Stack Experience (React/Next.js/React Native + Node.js/Express, transitioning to Python/FastAPI/GenAI/Distributed Systems)**  
-Standard: **FAANG / Tier-1 MNC Systems & AI Architecture**
+Standard: **FAANG / Tier-1 MNC Systems, Frontend & AI Architecture**
 
 ---
 
@@ -20,7 +20,7 @@ interview-prep/
 │   └── 22-cpython-interpreter-and-descriptors.md # CPython 3.11+ PEP 659, descriptors, metaclasses, typing, packaging
 │
 ├── 02-fastapi-backend/                        # ⚡ FASTAPI & BACKEND SYSTEMS
-│   ├── 04-fastapi-core.md                     # Params, Pydantic v2, DI, middleware, exceptions, async routes
+│   ├── 04-fastapi-core.md                 # Params, Pydantic v2, DI, middleware, exceptions, async routes
 │   ├── 05-fastapi-advanced.md                 # Auth (JWT/OAuth2), WebSockets, streaming, testing, deployment
 │   ├── 06-databases-orm.md                    # SQL joins/indexes, SQLAlchemy 2.0 (async), Alembic, PG vs NoSQL
 │   └── 23-asgi-internals-and-redis-ratelimit.md # ASGI specification, scope/receive/send, Pydantic Rust core, Lua rate limiter
@@ -44,11 +44,12 @@ interview-prep/
 │   ├── 13-project-talking-points.md           # STAR templates for Siraaj AI, Wishan, ERP & RAG setups
 │   └── 29-faang-cross-domain-interview-scenarios.md # 12 Comprehensive Staff scenarios across RAG, 100k QPS, FinTech & Leaks
 │
-├── 06-frontend-react/                         # ⚛️ REACT, NEXT.JS & REACT NATIVE
+├── 06-frontend-react/                         # ⚛️ JAVASCRIPT, REACT, NEXT.JS & MOBILE
 │   ├── 14-react-core-architecture.md          # Fiber Reconciler, Hooks deep dive, useRAGStream hook, Zustand vs Redux
 │   ├── 15-nextjs-and-react-native.md          # RSC vs SSR, Hydration, React Native New Architecture (JSI/Fabric), Offline Sync
 │   ├── 18-react-ecosystem-libraries.md        # Axios interceptors/refresh queue, TanStack Query, React Hook Form, Edge Runtime
-│   └── 27-microfrontends-and-rsc-internals.md # Module Federation, RSC Flight wire protocol, Hermes bytecode, Reanimated worklets
+│   ├── 27-microfrontends-and-rsc-internals.md # Module Federation, RSC Flight wire protocol, Hermes bytecode, Reanimated worklets
+│   └── 30-javascript-core-and-event-loop-deep-dive.md # V8 memory, React JS fundamentals (immutability, debounce, events), and JS vs Python Event Loop
 │
 ├── 07-database-design/                        # 🗄️ DATABASE DESIGN & ENGINEERING
 │   ├── 16-database-design-principles.md       # Normalization 1NF-BCNF, UUIDv7 vs BIGINT, Indexing, Multi-Tenancy & Partitioning
@@ -57,7 +58,7 @@ interview-prep/
 ├── 08-sdlc-engineering/                       # 🚀 SDLC, DEVOPS & OBSERVABILITY
 │   └── 17-sdlc-devops-practices.md            # Trunk-Based Git, CI/CD, Testing Pyramid, Observability, OWASP Security
 │
-└── questions-bank/                            # 💡 9 DEDICATED HIGH-YIELD QUESTION BANKS
+└── questions-bank/                            # 💡 10 DEDICATED HIGH-YIELD QUESTION BANKS
     ├── 01-python-fastapi-questions.md         # GIL, async def vs def, DI cleanup, Pydantic v2, SSE NGINX gotchas
     ├── 02-react-frontend-questions.md         # Fiber, hook rules, RSC vs SSR, hydration errors, Fabric/TurboModules
     ├── 03-rag-genai-questions.md              # Cosine vs Dot Product, single-stage HNSW, Bi vs Cross-encoders, Ragas
@@ -66,7 +67,8 @@ interview-prep/
     ├── 06-scale-fintech-scenarios-questions.md # 1K-100K QPS scaling math, flash sales, double-spend prevention, 1M vector batch
     ├── 07-react-ecosystem-nextjs-questions.md # Axios token refresh queue, TanStack Query, React Hook Form, Edge runtime
     ├── 08-mnc-tier1-deep-dive-questions.md    # Grammar-Constrained Decoding, EXPLAIN BUFFERS, PyMalloc arenas, KV Cache math
-    └── 09-faang-staff-systems-and-ai-questions.md # PEP 659, Redlock critique, Continuous Batching, ASGI scope/send, RSC Flight, Kafka EOS
+    ├── 09-faang-staff-systems-and-ai-questions.md # PEP 659, Redlock critique, Continuous Batching, ASGI scope/send, RSC Flight, Kafka EOS
+    └── 10-javascript-and-event-loop-questions.md # Microtask draining, React state immutability, debounce cleanup, JS vs Python Event Loop
 ```
 
 ---
@@ -74,7 +76,8 @@ interview-prep/
 ## 📊 FAANG / Tier-1 MNC Coverage Matrix
 
 | Area | Existing Coverage | New / Upgraded Coverage | Interview Depth |
-|---|---|---|---|
+|---|---|---|:---:|
+| **JavaScript Core & Event Loop** | React hooks, JSX syntax | V8 Memory (Heap/Stack), TDZ, Closures, Prototypal delegation, `this` 4 binding rules, WeakMap memory leaks, Browser/Node Event Loop (Call Stack, Microtasks, Macrotasks, Render queue) **vs. Python AsyncIO Event Loop** | **Staff Level**: Execution contexts, engine task queues, and starvation |
 | **Python Core** | Mutability, OOP, AsyncIO, Memory Leaks | CPython 3.11+ PEP 659 Adaptive Specializing Interpreter, Bytecode disasm, Descriptors, Metaclasses vs `__init_subclass__`, Generics, Covariance/Contravariance, `pyproject.toml`, Hypothesis testing | **Staff Level**: VM evaluation loop, C structs, and typing invariants |
 | **FastAPI** | Params, Pydantic v2, DI, Auth, Testing | ASGI 3.0 specification (`scope`, `receive`, `send`), Starlette vs Uvicorn lifecycle, `pydantic-core` Rust engine, Atomic Redis Lua token bucket rate limiter, gRPC vs REST, Circuit Breakers | **Staff Level**: Network protocol frames, concurrency safety |
 | **PostgreSQL** | Basic joins, B-Tree, SQLAlchemy 2.0 | B-Tree 8KB page splits, GIN/BRIN/Hash tradeoffs, `EXPLAIN (ANALYZE, BUFFERS)` execution plans, Autovacuum dead tuple bloat tuning, keyset pagination backfills, zero-downtime Alembic migrations | **Staff Level**: Storage engines, physical page buffers, CBO optimizer |
@@ -93,6 +96,7 @@ interview-prep/
 
 ## 🎯 Quick Navigation Links
 
+- **JavaScript Core & Dual Event Loop**: [30-javascript-core-and-event-loop-deep-dive.md](./06-frontend-react/30-javascript-core-and-event-loop-deep-dive.md)
 - **CPython VM & Descriptors**: [22-cpython-interpreter-and-descriptors.md](./01-python-core/22-cpython-interpreter-and-descriptors.md)
 - **ASGI & Redis Lua Rate Limiting**: [23-asgi-internals-and-redis-ratelimit.md](./02-fastapi-backend/23-asgi-internals-and-redis-ratelimit.md)
 - **LLM Serving & PagedAttention**: [24-llm-serving-pagedattention.md](./03-rag-vector-genai/24-llm-serving-pagedattention.md)
@@ -101,4 +105,5 @@ interview-prep/
 - **Micro-Frontends & RSC Flight**: [27-microfrontends-and-rsc-internals.md](./06-frontend-react/27-microfrontends-and-rsc-internals.md)
 - **Advanced FAANG DSA**: [28-advanced-dsa-faang-patterns.md](./04-system-design-dsa/28-advanced-dsa-faang-patterns.md)
 - **12 Integrated Staff Scenarios**: [29-faang-cross-domain-interview-scenarios.md](./05-behavioral/29-faang-cross-domain-interview-scenarios.md)
-- **Staff Systems & AI Question Bank**: [09-faang-staff-systems-and-ai-questions.md](./questions-bank/09-faang-staff-systems-and-ai-questions.md)
+- **JavaScript & Event Loop Questions**: [10-javascript-and-event-loop-questions.md](./questions-bank/10-javascript-and-event-loop-questions.md)
+- **Staff Systems & AI Questions**: [09-faang-staff-systems-and-ai-questions.md](./questions-bank/09-faang-staff-systems-and-ai-questions.md)
