@@ -2,7 +2,7 @@
 
 > **Target Audience:** FAANG / Tier-1 MNC Staff & Senior AI/Backend Engineers  
 > **Evaluation Focus:** OWASP Top 10 for LLMs, Indirect Prompt Injection, LangGraph State Machines, Contextual Compression  
-> **Cross-References:** [07-rag-fundamentals.md](./07-rag-fundamentals.md) | [09-rag-advanced.md](./09-rag-advanced.md) | [24-llm-serving-pagedattention.md](./24-llm-serving-pagedattention.md)
+> **Cross-References:** [07-rag-fundamentals.md](../03-rag-vector-genai/07-rag-fundamentals.md) | [09-rag-advanced.md](../03-rag-vector-genai/09-rag-advanced.md) | [24-llm-serving-pagedattention.md](24-llm-serving-pagedattention.md)
 
 ---
 

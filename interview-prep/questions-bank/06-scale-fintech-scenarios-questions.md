@@ -1,7 +1,7 @@
 # Interview Questions Bank: High-Scale Traffic, FinTech & Real-World Scenarios
 
 Target Role: Mid / Senior Python & AI Backend Engineer  
-Cross-References: [11-system-design-basics.md](../04-system-design-dsa/11-system-design-basics.md) | [19-high-scale-traffic-and-fintech.md](../04-system-design-dsa/19-high-scale-traffic-and-fintech.md) | [06-databases-orm.md](../02-fastapi-backend/06-databases-orm.md)
+Cross-References: [11-system-design-basics.md](../04-system-design-dsa/11-system-design-basics.md) | [19-high-scale-traffic-and-fintech.md](../advanced-optional/19-high-scale-traffic-and-fintech.md) | [06-databases-orm.md](../02-fastapi-backend/06-databases-orm.md)
 
 ---
 

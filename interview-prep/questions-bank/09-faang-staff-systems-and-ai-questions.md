@@ -1,8 +1,10 @@
 # Interview Questions Bank: FAANG & Tier-1 Staff Systems, AI & Architecture
 
+> 🧗 **Stretch material (optional).** This is the hardest bank — Staff/Principal level. Skip it for a first pass; use [`../00-start-here/`](../00-start-here/) for everyday prep and only come back here for very hard rounds.
+
 > **Target Audience:** FAANG / Tier-1 MNC Staff & Principal Engineering Rounds  
 > **Style:** Rigorous Technical Depth, Mathematical Proofs, Systemic Failure Modes, Verbatim Staff-Level Responses  
-> **Cross-References:** [22-cpython-interpreter-and-descriptors.md](../01-python-core/22-cpython-interpreter-and-descriptors.md) | [23-asgi-internals-and-redis-ratelimit.md](../02-fastapi-backend/23-asgi-internals-and-redis-ratelimit.md) | [24-llm-serving-pagedattention.md](../03-rag-vector-genai/24-llm-serving-pagedattention.md) | [26-distributed-systems-kafka-saga.md](../04-system-design-dsa/26-distributed-systems-kafka-saga.md)
+> **Cross-References:** [22-cpython-interpreter-and-descriptors.md](../advanced-optional/22-cpython-interpreter-and-descriptors.md) | [23-asgi-internals-and-redis-ratelimit.md](../advanced-optional/23-asgi-internals-and-redis-ratelimit.md) | [24-llm-serving-pagedattention.md](../advanced-optional/24-llm-serving-pagedattention.md) | [26-distributed-systems-kafka-saga.md](../advanced-optional/26-distributed-systems-kafka-saga.md)
 
 ---
 

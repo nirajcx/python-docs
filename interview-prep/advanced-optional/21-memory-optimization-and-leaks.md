@@ -2,7 +2,7 @@
 
 > **Target Audience:** Tier-1 MNCs, FAANG, AI Platforms (Senior / Staff Engineer Level)  
 > **Scope:** Full-Stack & Systems Depth (CPython Heap, PyMalloc, Linux cgroups/OOM, React Closures, CUDA VRAM)  
-> **Cross-References:** [01-python-fundamentals.md](./01-python-fundamentals.md) | [02-python-oop.md](./02-python-oop.md) | [14-react-core-architecture.md](../06-frontend-react/14-react-core-architecture.md) | [20-advanced-database-engineering-and-migrations.md](../07-database-design/20-advanced-database-engineering-and-migrations.md)
+> **Cross-References:** [01-python-fundamentals.md](../01-python-core/01-python-fundamentals.md) | [02-python-oop.md](../01-python-core/02-python-oop.md) | [14-react-core-architecture.md](../06-frontend-react/14-react-core-architecture.md) | [20-advanced-database-engineering-and-migrations.md](20-advanced-database-engineering-and-migrations.md)
 
 ---
 

@@ -2,7 +2,7 @@
 
 > **Target Audience:** MNC / Tier-1 Tech Interviews (Staff / Senior Backend & AI Systems Engineer)  
 > **Perspective:** Systems Architecture, Engine Internals, PostgreSQL 16+, Production Python Scripts  
-> **Cross-References:** [06-databases-orm.md](../02-fastapi-backend/06-databases-orm.md) | [16-database-design-principles.md](./16-database-design-principles.md) | [19-high-scale-traffic-and-fintech.md](../04-system-design-dsa/19-high-scale-traffic-and-fintech.md)
+> **Cross-References:** [06-databases-orm.md](../02-fastapi-backend/06-databases-orm.md) | [16-database-design-principles.md](../07-database-design/16-database-design-principles.md) | [19-high-scale-traffic-and-fintech.md](19-high-scale-traffic-and-fintech.md)
 
 ---
 

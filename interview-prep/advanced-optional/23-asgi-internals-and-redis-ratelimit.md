@@ -2,7 +2,7 @@
 
 > **Target Audience:** FAANG / Tier-1 MNC Staff & Senior Backend Engineers  
 > **Evaluation Focus:** ASGI Request Lifecycle, Starlette vs Uvicorn, Pydantic-Core Rust, Redis Lua Rate Limiters  
-> **Cross-References:** [04-fastapi-core.md](./04-fastapi-core.md) | [05-fastapi-advanced.md](./05-fastapi-advanced.md) | [19-high-scale-traffic-and-fintech.md](../04-system-design-dsa/19-high-scale-traffic-and-fintech.md)
+> **Cross-References:** [04-fastapi-core.md](../02-fastapi-backend/04-fastapi-core.md) | [05-fastapi-advanced.md](../02-fastapi-backend/05-fastapi-advanced.md) | [19-high-scale-traffic-and-fintech.md](19-high-scale-traffic-and-fintech.md)
 
 ---
 

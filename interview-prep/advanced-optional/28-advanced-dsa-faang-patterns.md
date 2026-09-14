@@ -2,7 +2,7 @@
 
 > **Target Audience:** FAANG / Tier-1 MNC Coding Rounds (Senior / Staff Level)  
 > **Patterns Covered:** Binary Search on Answer, Monotonic Stack, Trie, Union-Find (DSU), Topological Sort, Dynamic Programming, Intervals  
-> **Cross-References:** [12-dsa-essentials.md](./12-dsa-essentials.md)
+> **Cross-References:** [12-dsa-essentials.md](../04-system-design-dsa/12-dsa-essentials.md)
 
 ---
 

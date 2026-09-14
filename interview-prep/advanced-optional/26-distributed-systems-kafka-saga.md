@@ -2,7 +2,7 @@
 
 > **Target Audience:** FAANG / Tier-1 MNC Staff & Principal Systems Engineers  
 > **Evaluation Focus:** Consensus (Raft/etcd), Redlock vs Fencing Tokens, 2PC vs Saga, Kafka Event Architecture, CAP/PACELC  
-> **Cross-References:** [11-system-design-basics.md](./11-system-design-basics.md) | [19-high-scale-traffic-and-fintech.md](./19-high-scale-traffic-and-fintech.md) | [20-advanced-database-engineering-and-migrations.md](../07-database-design/20-advanced-database-engineering-and-migrations.md)
+> **Cross-References:** [11-system-design-basics.md](../04-system-design-dsa/11-system-design-basics.md) | [19-high-scale-traffic-and-fintech.md](19-high-scale-traffic-and-fintech.md) | [20-advanced-database-engineering-and-migrations.md](20-advanced-database-engineering-and-migrations.md)
 
 ---
 

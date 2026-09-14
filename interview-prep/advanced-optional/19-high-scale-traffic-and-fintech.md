@@ -1,7 +1,7 @@
 # High-Scale Traffic (1K to 100K QPS), FinTech Transactions & Real-World System Scenarios
 
 Target Role: Mid / Senior Python & FastAPI Backend Engineer  
-Cross-References: [03-python-async.md](../01-python-core/03-python-async.md) | [06-databases-orm.md](../02-fastapi-backend/06-databases-orm.md) | [11-system-design-basics.md](./11-system-design-basics.md) | [16-database-design-principles.md](../07-database-design/16-database-design-principles.md)
+Cross-References: [03-python-async.md](../01-python-core/03-python-async.md) | [06-databases-orm.md](../02-fastapi-backend/06-databases-orm.md) | [11-system-design-basics.md](../04-system-design-dsa/11-system-design-basics.md) | [16-database-design-principles.md](../07-database-design/16-database-design-principles.md)
 
 ---
 

@@ -1,8 +1,10 @@
 # Interview Questions Bank: MNC Tier-1 Tech Deep Dive (Databases, AI & Systems)
 
+> 🧗 **Stretch material (optional).** This bank goes deeper than most mid-size company interviews require. For everyday prep, use [`../00-start-here/`](../00-start-here/) first. Come back here only for hard rounds.
+
 > **Target Audience:** Tier-1 MNCs, FAANG, AI Unicorns, Enterprise Fintech  
 > **Evaluation Bar:** Senior / Staff Level (Precision, engine internals, mathematical trade-offs, zero hand-waving)  
-> **Cross-References:** [20-advanced-database-engineering-and-migrations.md](../07-database-design/20-advanced-database-engineering-and-migrations.md) | [10-llm-integration.md](../03-rag-vector-genai/10-llm-integration.md) | [19-high-scale-traffic-and-fintech.md](../04-system-design-dsa/19-high-scale-traffic-and-fintech.md)
+> **Cross-References:** [20-advanced-database-engineering-and-migrations.md](../advanced-optional/20-advanced-database-engineering-and-migrations.md) | [10-llm-integration.md](../03-rag-vector-genai/10-llm-integration.md) | [19-high-scale-traffic-and-fintech.md](../advanced-optional/19-high-scale-traffic-and-fintech.md)
 
 ---
 

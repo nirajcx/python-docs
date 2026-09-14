@@ -2,7 +2,7 @@
 
 > **Target Audience:** FAANG / Tier-1 MNC Staff & Senior Full-Stack, Backend & AI Engineers  
 > **Evaluation Bar:** End-to-End System Architecture, Real-World Incidents, Quantitative Sizing, Trade-Off Justifications  
-> **Cross-References:** [11-system-design-basics.md](../04-system-design-dsa/11-system-design-basics.md) | [19-high-scale-traffic-and-fintech.md](../04-system-design-dsa/19-high-scale-traffic-and-fintech.md) | [24-llm-serving-pagedattention.md](../03-rag-vector-genai/24-llm-serving-pagedattention.md) | [26-distributed-systems-kafka-saga.md](../04-system-design-dsa/26-distributed-systems-kafka-saga.md)
+> **Cross-References:** [11-system-design-basics.md](../04-system-design-dsa/11-system-design-basics.md) | [19-high-scale-traffic-and-fintech.md](19-high-scale-traffic-and-fintech.md) | [24-llm-serving-pagedattention.md](24-llm-serving-pagedattention.md) | [26-distributed-systems-kafka-saga.md](26-distributed-systems-kafka-saga.md)
 
 ---
 

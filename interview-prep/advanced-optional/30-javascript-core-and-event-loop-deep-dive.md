@@ -2,7 +2,7 @@
 
 > **Target Audience:** FAANG / Tier-1 MNC Staff & Senior Full-Stack Engineers  
 > **Scope:** JavaScript V8 Engine Internals, ES6+ React Foundations (Immutability, Destructuring, Functional Transforms), Closures, Prototypal Inheritance, and a Systematic Deep-Dive Comparison of the **JavaScript (V8/libuv) vs. Python (AsyncIO/uvloop) Event Loops**  
-> **Cross-References:** [03-python-async.md](../01-python-core/03-python-async.md) | [14-react-core-architecture.md](./14-react-core-architecture.md) | [18-react-ecosystem-libraries.md](./18-react-ecosystem-libraries.md) | [21-memory-optimization-and-leaks.md](../01-python-core/21-memory-optimization-and-leaks.md)
+> **Cross-References:** [03-python-async.md](../01-python-core/03-python-async.md) | [14-react-core-architecture.md](../06-frontend-react/14-react-core-architecture.md) | [18-react-ecosystem-libraries.md](../06-frontend-react/18-react-ecosystem-libraries.md) | [21-memory-optimization-and-leaks.md](21-memory-optimization-and-leaks.md)
 
 ---
 

@@ -2,7 +2,7 @@
 
 > **Target Audience:** FAANG / Tier-1 AI Infrastructure & GenAI Engineers  
 > **Evaluation Focus:** Prefill vs Decode, Memory Bandwidth Bottlenecks, PagedAttention Virtual Paging, Continuous Batching, Quantization  
-> **Cross-References:** [10-llm-integration.md](./10-llm-integration.md) | [21-memory-optimization-and-leaks.md](../01-python-core/21-memory-optimization-and-leaks.md) | [25-genai-security-and-guardrails.md](./25-genai-security-and-guardrails.md)
+> **Cross-References:** [10-llm-integration.md](../03-rag-vector-genai/10-llm-integration.md) | [21-memory-optimization-and-leaks.md](21-memory-optimization-and-leaks.md) | [25-genai-security-and-guardrails.md](25-genai-security-and-guardrails.md)
 
 ---
 

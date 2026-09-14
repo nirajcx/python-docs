@@ -2,7 +2,7 @@
 
 > **Target Audience:** FAANG / Tier-1 MNC Staff & Senior Python Engineers  
 > **Evaluation Focus:** CPython VM Internals, PEP 659 Adaptive Specialization, Object Model Protocols, Static Typing  
-> **Cross-References:** [01-python-fundamentals.md](./01-python-fundamentals.md) | [02-python-oop.md](./02-python-oop.md) | [21-memory-optimization-and-leaks.md](./21-memory-optimization-and-leaks.md)
+> **Cross-References:** [01-python-fundamentals.md](../01-python-core/01-python-fundamentals.md) | [02-python-oop.md](../01-python-core/02-python-oop.md) | [21-memory-optimization-and-leaks.md](21-memory-optimization-and-leaks.md)
 
 ---
 

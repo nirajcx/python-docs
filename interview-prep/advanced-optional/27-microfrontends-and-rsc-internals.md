@@ -2,7 +2,7 @@
 
 > **Target Audience:** FAANG / Tier-1 MNC Staff & Senior Frontend / Full-Stack Engineers  
 > **Evaluation Focus:** Module Federation, React Server Components (Flight Wire Protocol), Hermes Bytecode, Reanimated Worklets  
-> **Cross-References:** [14-react-core-architecture.md](./14-react-core-architecture.md) | [15-nextjs-and-react-native.md](./15-nextjs-and-react-native.md) | [18-react-ecosystem-libraries.md](./18-react-ecosystem-libraries.md)
+> **Cross-References:** [14-react-core-architecture.md](../06-frontend-react/14-react-core-architecture.md) | [15-nextjs-and-react-native.md](../06-frontend-react/15-nextjs-and-react-native.md) | [18-react-ecosystem-libraries.md](../06-frontend-react/18-react-ecosystem-libraries.md)
 
 ---
 

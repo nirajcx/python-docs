@@ -1,8 +1,10 @@
 # Interview Questions Bank: JavaScript Core, React Foundations & Dual-Language Event Loop
 
+> 🧗 **Stretch material (optional).** This bank goes deeper than most mid-size company interviews require. For everyday prep, use [`../00-start-here/`](../00-start-here/) first. Come back here only if you want the deep JS/event-loop angle.
+
 > **Target Audience:** FAANG / Tier-1 MNC Staff & Senior Full-Stack Engineers  
 > **Evaluation Bar:** V8 Memory Allocations, React Immutability Mechanics, Microtask Draining, Python AsyncIO vs JS Event Loop, DOM Event Delegation vs React SyntheticEvents  
-> **Cross-References:** [30-javascript-core-and-event-loop-deep-dive.md](../06-frontend-react/30-javascript-core-and-event-loop-deep-dive.md) | [03-python-async.md](../01-python-core/03-python-async.md) | [14-react-core-architecture.md](../06-frontend-react/14-react-core-architecture.md)
+> **Cross-References:** [30-javascript-core-and-event-loop-deep-dive.md](../advanced-optional/30-javascript-core-and-event-loop-deep-dive.md) | [03-python-async.md](../01-python-core/03-python-async.md) | [14-react-core-architecture.md](../06-frontend-react/14-react-core-architecture.md)
 
 ---
 
