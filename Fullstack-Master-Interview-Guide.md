@@ -47,6 +47,7 @@
   - [37. Zero-Downtime Database Migrations: The Expand/Contract Pattern](#37-zero-downtime-database-migrations-the-expandcontract-pattern)
   - [38. Advanced Docker Layer Optimization, Secrets Management & DevOps Philosophy](#38-advanced-docker-layer-optimization-secrets-management--devops-philosophy)
   - [39. JavaScript vs Python Event Loops & Asynchronous Runtimes (libuv, process.nextTick, asyncio)](#39-javascript-vs-python-event-loops--asynchronous-runtimes-libuv-processnexttick-asyncio)
+  - [40. NoSQL & MongoDB Architecture: Document Modeling, Aggregations & FastAPI Motor Integration](#40-nosql--mongodb-architecture-document-modeling-aggregations--fastapi-motor-integration)
 - [PART 2 — INTERVIEW QUESTION BANK (Detailed Answers & Spoken Talking Points)](#part-2--interview-question-bank)
 - [PART 3 — TRICKY & TRAP QUESTIONS (T1 to T10 with Mental Models & Hinglish Intuition)](#part-3--tricky--trap-questions)
 - [PART 4 — CODING CHALLENGES (Prompts 1 to 7 with Evaluation Rubrics)](#part-4--coding-challenges)
@@ -367,10 +368,154 @@ stmt = select(Order).options(selectinload(Order.customer))
 orders = (await db.execute(stmt)).scalars().all()
 ```
 
-### 3.4 PostgreSQL Transaction Isolation Levels
-1. **Read Committed (Default):** Sees only committed data. Allows **Non-repeatable Reads** (querying the same row twice inside the same transaction can return different values if another transaction committed in between).
-2. **Repeatable Read:** Takes a snapshot at transaction start. Guarantees identical reads throughout the transaction.
-3. **Serializable:** Highest level. Simulates serial execution. Prevents write skew by detecting conflicting dependencies and forcing rollbacks with retry.
+### 3.4 Database Transactions, ACID Properties & Internal Mechanics (WAL, COMMIT, ROLLBACK)
+A transaction is a single logical unit of work that must satisfy the **ACID** guarantees:
+- **Atomicity (All-or-Nothing):** If any query inside the transaction fails, all preceding changes are completely rolled back.
+- **Consistency:** The database transitions from one valid state to another, enforcing all schema constraints, foreign keys, unique indexes, and check conditions.
+- **Isolation:** Concurrent transactions execute without cross-contamination.
+- **Durability:** Once committed, changes survive server crashes, power cuts, and OS reboots.
+
+#### How `COMMIT` and `ROLLBACK` Work Internally in PostgreSQL
+PostgreSQL uses **MVCC (Multi-Version Concurrency Control)** paired with the **WAL (Write-Ahead Log)**:
+
+```
+[ Application Client ] ── 1. BEGIN TRANSACTION ──> [ PostgreSQL Engine ]
+        │                                                     │
+        ├── 2. INSERT / UPDATE statement ────────────────────>├── Writes row with current Transaction ID (xmin)
+        │                                                     └── Appends change to memory buffer
+        │
+        ├── 3. COMMIT Command:
+        │      ├── Appends "COMMIT" record to WAL (Write-Ahead Log) on disk
+        │      ├── Calls fsync() to ensure physical persistence
+        │      └── Marks transaction status as 'COMMITTED' in pg_xact
+        │          (Now visible to other transactions!)
+        │
+        └── OR 3. ROLLBACK Command:
+               ├── Writes "ABORT" record to pg_xact
+               └── Does NOT erase row data from disk immediately!
+                   (Other transactions simply ignore rows whose xmin is 'ABORTED'.
+                    The VACUUM daemon cleans them up as dead tuples later).
+```
+
+- **The Big Interview Insight:** A `ROLLBACK` in PostgreSQL does **not** physically rewrite or erase disk blocks. It simply sets a single bit in the transaction status log (`pg_xact`) to `ABORTED`. When other queries read table pages, they inspect the row's `xmin` (creator transaction ID). Seeing that `xmin` was aborted, Postgres skips the row as invisible. Later, the background **`VACUUM`** process reclaims that physical disk space!
+
+---
+
+### 3.5 PostgreSQL Transaction Isolation Levels & Concurrency Anomalies
+PostgreSQL provides three active ANSI isolation levels:
+
+| Isolation Level | Dirty Read | Non-Repeatable Read | Phantom Read | Serialization Anomaly |
+|---|---|---|---|---|
+| **Read Committed (Default)** | ❌ Prevented | ⚠️ Allowed | ⚠️ Allowed | ⚠️ Allowed |
+| **Repeatable Read** | ❌ Prevented | ❌ Prevented | ❌ Prevented (via Snapshot) | ⚠️ Allowed (Write Skew) |
+| **Serializable** | ❌ Prevented | ❌ Prevented | ❌ Prevented | ❌ Prevented |
+
+1. **Read Committed (Default):**
+   - Each statement inside the transaction sees a fresh snapshot of all data committed before *that statement* started.
+   - *Anomaly Allowed:* **Non-repeatable read** (if Transaction A reads a row, Transaction B updates it and commits, Transaction A re-reads the row inside the same transaction and sees the updated value).
+2. **Repeatable Read:**
+   - A single database snapshot is taken at the start of the *first statement in the transaction*. All subsequent queries see that exact frozen point in time.
+   - If another transaction updates a row that Transaction A tries to modify, Transaction A aborts immediately with: `ERROR: could not serialize access due to concurrent update`.
+3. **Serializable:**
+   - The strictest level. Simulates serial (one-by-one) execution.
+   - Uses SSI (Serializable Snapshot Isolation) to track read-write dependencies. If a **write skew** is detected, the database forces a rollback, requiring the application to catch the exception and retry.
+
+---
+
+### 3.6 Savepoints, Nested Transactions & Partial Rollbacks
+What happens if you have a 10-step checkout transaction (charges card, creates invoice, updates stock, creates reward points), and step 9 (reward points) fails due to a network glitch? You don't want to cancel the entire order!
+- A **`SAVEPOINT`** is a marker inside a transaction that allows rolling back a portion of the transaction without aborting the entire unit of work:
+
+```sql
+BEGIN;
+  INSERT INTO orders (id, user_id, amount) VALUES (1, 45, 100);
+  UPDATE inventory SET stock = stock - 1 WHERE item_id = 99;
+  
+  SAVEPOINT reward_points_savepoint;
+    INSERT INTO reward_points (user_id, points) VALUES (45, 'invalid_int'); -- Fails!
+  ROLLBACK TO SAVEPOINT reward_points_savepoint; -- Undoes reward points, keeps order & inventory!
+  
+COMMIT; -- Order and inventory are successfully saved!
+```
+
+- **In SQLAlchemy 2.0 (Nested Transactions):**
+  ```python
+  async with session.begin(): # Main transaction
+      session.add(order)
+      session.add(inventory_update)
+      
+      try:
+          async with session.begin_nested(): # Emits SAVEPOINT!
+              session.add(reward_points)
+              await session.flush()
+      except Exception:
+          # Automatically emits ROLLBACK TO SAVEPOINT; outer transaction remains intact!
+          logger.warning("Failed to credit reward points, continuing checkout...")
+  ```
+
+---
+
+### 3.7 Concurrency Control: Pessimistic Locking vs Optimistic Locking
+When multiple users click "Buy" on the last available concert ticket at the exact same millisecond:
+
+#### 1. Pessimistic Locking (`SELECT ... FOR UPDATE`):
+- Explicitly locks the database row at the engine level. Other concurrent transactions attempting to read with `FOR UPDATE` or write to that row are **blocked and put to sleep** until the first transaction commits or rolls back.
+```python
+# FastAPI / SQLAlchemy Pessimistic Locking
+async def purchase_ticket(event_id: int, db: AsyncSession):
+    async with db.begin():
+        # Locks this specific event row exclusively!
+        stmt = (
+            select(Event)
+            .where(Event.id == event_id)
+            .with_for_update() # Emits SELECT ... FOR UPDATE
+        )
+        event = (await db.execute(stmt)).scalar_one()
+        if event.available_seats <= 0:
+            raise HTTPException(status_code=400, detail="Sold out!")
+        event.available_seats -= 1
+        # Row is unlocked automatically when transaction commits
+```
+- *Best For:* High contention, low tolerance for retries (e.g. ticket booking, financial account withdrawals).
+
+#### 2. Optimistic Locking (Version Column):
+- Does NOT hold database locks. Instead, uses a `version` integer column:
+  `UPDATE products SET stock = stock - 1, version = version + 1 WHERE id = 1 AND version = 5;`
+- If rowcount is 0, it means another transaction modified the row in between! The application catches this and retries.
+- *Best For:* High read, low contention systems (e.g. editing a wiki document or blog post).
+
+---
+
+### 3.8 FastAPI & SQLAlchemy 2.0 Transaction Management (Unit of Work)
+Never manually call `session.commit()` and `session.rollback()` scattered across dozens of service functions. Use the **Unit of Work Context Manager Pattern**:
+
+```python
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def transaction_scope(session: AsyncSession):
+    """Guarantees atomic commit or rollback around business operations."""
+    try:
+        yield session
+        await session.commit()
+    except Exception:
+        await session.rollback()
+        raise
+
+# In FastAPI dependency injection:
+async def get_db_with_transaction():
+    async with AsyncSessionLocal() as session:
+        async with session.begin(): # Begins transaction
+            yield session
+            # Auto-commits if no exception raised; auto-rollbacks if route raises an HTTPException!
+```
+
+> 💡 **Aasaan Bhasha Mein (In Simple Words):**
+> - **Commit vs Rollback under the hood:** Postgres me jab aap `COMMIT` karte ho toh wo data ko disk ke **WAL (Write-Ahead Log)** me likhta hai aur status ko `COMMITTED` karta hai. Jab aap `ROLLBACK` karte ho, toh Postgres disk se data delete nahi karta; wo sirf transaction status ko `ABORTED` mark kar deta hai. Doosri queries us data ko dekh kar ignore kar deti hain, aur baad me `VACUUM` aakar us kachre ko saaf karta hai.
+> - **Savepoint kya hota hai?** Ek badi transaction ke beech me "check-point" bana dena. Agar aage chalkar koi choti cheez (jaise reward points) fail ho jaye, toh hum poora order cancel karne ke bajaye sirf `ROLLBACK TO SAVEPOINT` karke us choti cheez ko undo kar sakte hain aur baaki order save ho jata hai.
+> - **Pessimistic vs Optimistic Locking:**
+>   - **Pessimistic (`FOR UPDATE`):** Row ko lock kar do taaki koi doosra banda use haath na laga sake jab tak aapka kaam khatam na ho (jaise Tatkal ticket booking).
+>   - **Optimistic (Version number):** Bina lock kiye update karo; agar update karte waqt version badal gaya ho toh dobara retry karo (jaise blog post edit karna).
 
 ---
 
@@ -2541,6 +2686,193 @@ Concurrency Model │ PYTHON: Multi-Threaded OS Engine              │
 >   Python ka `asyncio` OS ke selector (`epoll`/`kqueue`) se baat karta hai. Jab aap `await` likhte ho, toh coroutine pause ho jati hai aur loop doosre request par chala jata hai. FastAPI me **`uvloop`** lagane se Python ka event loop bhi Node.js ke `libuv` jitna fast ban jata hai!
 > - **Dono me difference:** Node.js me file read automatically background thread pool me chali jati hai. Python me agar aapne `open()` call kar diya async function ke andar, toh poora event loop freeze ho jayega—isliye Python me `aiofiles` ya `asyncio.to_thread()` use karna zaroori hota hai!
 
+---
+
+## 40. NoSQL & MongoDB Architecture: Document Modeling, Aggregations & FastAPI Motor Integration
+
+> 🎯 **Database Architecture Frontier:** *"When should you choose MongoDB over PostgreSQL? How do you design schemas in document databases (Embedding vs Referencing)? How do Aggregations work, and how do you connect MongoDB asynchronously in FastAPI?"*
+
+### 40.1 SQL vs NoSQL: The Architectural Decision Matrix
+A senior developer never says *"NoSQL is newer so it is better"* or *"SQL is old"*. You pick based on data access patterns and relational complexity:
+
+```
+[ Data Storage Decision Engine ]
+               │
+      Are relationships complex?
+      (Many-to-Many, Foreign Keys, RLS, ACID Transactions across tables)
+              / \
+        YES  /   \  NO
+            ▼     ▼
+    [ PostgreSQL ]  Is the schema polymorphic, rapidly evolving,
+                    or an append-only event/document feed?
+                           / \
+                     YES  /   \  NO
+                         ▼     ▼
+                 [ MongoDB ]  [ Redis / S3 ]
+```
+
+| Dimension | Relational (PostgreSQL) | Document NoSQL (MongoDB) |
+|---|---|---|
+| **Data Model** | Tabular: Rows and Columns with strict schemas. | Document: BSON (Binary JSON) with flexible, dynamic schemas. |
+| **Integrity & Constraints** | Strict foreign keys, check constraints, database-enforced integrity. | Application-enforced integrity; schema validation rules optional. |
+| **Scaling Model** | Vertical scaling primarily (scale up CPU/RAM) + Read Replicas. | Native Horizontal Sharding across clusters based on a Shard Key. |
+| **Transactions** | Full multi-table ACID transactions with rich isolation levels. | Multi-document ACID transactions supported since v4.0 (higher latency overhead). |
+| **Query Flexibility** | Advanced SQL: Joins, CTEs, Window Functions, Full-Text, pgvector. | Aggregation Pipelines (`$match`, `$group`, `$lookup`, `$unwind`). |
+| **Best For** | Multi-tenant SaaS, FinTech, ERP, complex relational schemas. | Catalogs, Content Management (CMS), polymorphic metadata, real-time analytics feeds. |
+
+---
+
+### 40.2 PostgreSQL `JSONB` vs MongoDB: The Senior Engineering Reality
+Modern PostgreSQL has first-class **`JSONB` columns with GIN indexes**:
+- You can query, filter, and index nested JSON inside PostgreSQL: `WHERE metadata->>'plan' = 'enterprise'`.
+- **The 80/20 Rule:** PostgreSQL `JSONB` solves 80% of use cases that previously drove developers to MongoDB, while keeping foreign keys and transactional safety.
+- **When Does MongoDB Genuinely Win?**
+  1. **Native Auto-Sharding:** When write volume exceeds a single database node ($> 50,000$ writes/sec) and requires horizontal partitioning across 20 shards.
+  2. **Entirely Polymorphic Data:** When every document has a completely different structure (e.g. IoT sensor telemetry with 500 different device types).
+  3. **Real-time Change Streams:** Subscribing directly to MongoDB's `oplog` to stream collection updates into WebSockets.
+
+---
+
+### 40.3 Data Modeling: Embedding (Denormalization) vs Referencing (Normalization)
+This is the **#1 MongoDB interview design challenge**:
+
+```
+EMBEDDING PATTERN (1-to-Few):
+=============================
+{
+  "_id": ObjectId("65f..."),
+  "order_number": "ORD-101",
+  "items": [                                <── Embedded array of sub-documents
+    { "name": "Laptop", "price": 1200 },
+    { "name": "Mouse", "price": 25 }
+  ]
+}
+Pros: Single disk read! 1 query fetches order AND all its items (atomic write).
+Cons: 16MB document size ceiling; unbounded array growth risks memory bloat.
+
+REFERENCING PATTERN (1-to-Many / 1-to-Squillions):
+==================================================
+Order Collection:
+{ "_id": ObjectId("65f..."), "order_number": "ORD-101" }
+
+OrderItems Collection:
+{ "_id": ObjectId("71a..."), "order_id": ObjectId("65f..."), "name": "Laptop" }
+
+Pros: Scales to millions of sub-records; avoids 16MB limit.
+Cons: Requires `$lookup` (MongoDB join) or secondary queries, increasing latency.
+```
+
+- **The Golden Rules of MongoDB Schema Design:**
+  1. **1-to-Few ($< 100$ items):** Embed (e.g. user delivery addresses, tax line items).
+  2. **1-to-Many ($100$ to $5,000$ items):** Embed references or use two collections (e.g. product reviews).
+  3. **1-to-Squillions ($> 5,000$ items):** Always reference with a parent pointer (e.g. server access logs pointing to `server_id`).
+  4. **The 16MB Hard Limit:** A single MongoDB BSON document cannot exceed **16 megabytes**. If an array can grow indefinitely, **never embed it**!
+
+---
+
+### 40.4 MongoDB Indexing & Query Optimization
+- **`explain("executionStats")`:**
+  - `COLLSCAN` (Collection Scan) = Bad (reads every document in the collection, equivalent to Postgres `Seq Scan`).
+  - `IXSCAN` (Index Scan) = Great (uses B-tree index).
+- **Index Types:**
+  - **Single Field:** `db.users.createIndex({ email: 1 }, { unique: true })`
+  - **Compound Index:** `db.orders.createIndex({ tenant_id: 1, created_at: -1 })` (Subject to the same leftmost prefix rule as SQL!).
+  - **Multikey Index:** Automatically created when indexing an array field (indexes every single value in the array).
+  - **TTL Index (Time-To-Live):** Automatically deletes documents after $N$ seconds:
+    `db.sessions.createIndex({ "created_at": 1 }, { expireAfterSeconds: 86400 })` (Perfect for ephemeral auth sessions or OTP codes!).
+
+---
+
+### 40.5 The Aggregation Pipeline Explained
+The aggregation pipeline processes documents through sequential stages (like Unix pipes `cat | grep | sort`):
+
+```javascript
+// Complex Aggregation: Find total sales per product category for Tenant A
+db.orders.aggregate([
+  // Stage 1: Filter documents early to minimize pipeline volume (Use Index!)
+  { $match: { tenant_id: "org_123", status: "completed" } },
+  
+  // Stage 2: Flatten embedded items array into individual documents
+  { $unwind: "$items" },
+  
+  // Stage 3: Group by category and compute metrics
+  { 
+    $group: {
+      _id: "$items.category",
+      totalRevenue: { $sum: { $multiply: ["$items.price", "$items.quantity"] } },
+      itemCount: { $sum: "$items.quantity" }
+    }
+  },
+  
+  // Stage 4: Sort by revenue descending
+  { $sort: { totalRevenue: -1 } },
+  
+  // Stage 5: Project clean output format
+  { 
+    $project: {
+      _id: 0,
+      category: "$_id",
+      totalRevenue: 1,
+      itemCount: 1
+    }
+  }
+]);
+```
+
+---
+
+### 40.6 Asynchronous MongoDB in FastAPI using `Motor`
+In Python/FastAPI, never use standard synchronous `pymongo` inside `async def` routes (it blocks the event loop!). Use **`motor`** (the official async driver) or **`Beanie`** (Pydantic ODM):
+
+```python
+from motor.motor_asyncio import AsyncIOMotorClient
+from pydantic import BaseModel, Field, BeforeValidator
+from typing import Annotated
+from bson import ObjectId
+
+# Helper to serialize MongoDB ObjectId to string in Pydantic v2
+PyObjectId = Annotated[str, BeforeValidator(lambda v: str(v) if isinstance(v, ObjectId) else v)]
+
+class ProductModel(BaseModel):
+    id: PyObjectId = Field(default=None, alias="_id")
+    tenant_id: str
+    name: str
+    price: float
+
+# Motor Client Lifecycle in FastAPI
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    app.mongodb_client = AsyncIOMotorClient("mongodb://localhost:27017")
+    app.mongodb = app.mongodb_client["enterprise_db"]
+    yield
+    app.mongodb_client.close()
+
+@app.post("/api/v1/products", response_model=ProductModel)
+async def create_product(product: ProductModel, request: Request):
+    doc = product.model_dump(by_alias=True, exclude=["id"])
+    result = await request.app.mongodb["products"].insert_one(doc)
+    doc["_id"] = result.inserted_id
+    return doc
+```
+
+---
+
+### 40.7 High Availability: Replica Sets & Write Concerns
+- **Replica Sets:** A cluster consists of 1 Primary and 2+ Secondary nodes. If Primary crashes, Secondaries hold an automated election in $< 3$ seconds.
+- **Write Concern (`w`):**
+  - `w: 1`: Primary writes to memory and confirms. Fast, but risk of data loss if Primary crashes before syncing to secondaries.
+  - `w: "majority"`: Primary confirms **only after a majority of replica nodes** have committed the write to their write-ahead journals. Immune to rollback data loss during failovers.
+- **Read Preference:**
+  - `primary`: Default, guarantees strict read-after-write consistency.
+  - `secondaryPreferred`: Routes reads to replicas, offloading the primary node for heavy analytics reports.
+
+> 💡 **Aasaan Bhasha Mein (In Simple Words):**
+> - **SQL vs NoSQL kab choose karein?**
+>   Agar complex relations, foreign keys, aur strict multi-table transactions chahiye toh **PostgreSQL** best hai. Agar data dynamic hai (har document alag format ka hai) ya massive horizontal sharding chahiye toh **MongoDB** use hota hai.
+> - **Embed karein ya Reference?**
+>   Agar 1 order ke 4 items hain toh unhe usi document me **Embed** kar do (1 hi query me fast read hoga). Lekin agar ek product ke 10,000 reviews hain toh unhe **Reference** alag collection me rakho, kyunki MongoDB me ek document ka size **16 MB se zyada nahi ho sakta**!
+> - **FastAPI me MongoDB:** Hamesha **`motor`** driver use karo kyunki `pymongo` synchronous hota hai aur event loop ko block kar deta hai.
+
 # PART 2 — INTERVIEW QUESTION BANK (DETAILED ANSWERS & SPOKEN TALKING POINTS)
 
 > **Interviewer Perspective:** In 2–4 YOE interviews, senior engineers do not want robotic, 10-word definitions. They listen for: (1) immediate clarity, (2) awareness of underlying memory/runtime mechanics, (3) real-world gotchas or failure modes, and (4) how you actually defend decisions in production.
@@ -2842,6 +3174,68 @@ Concurrency Model │ PYTHON: Multi-Threaded OS Engine              │
     `SET LOCAL app.current_tenant_id = 'tenant-uuid';`.
   - Even if application code executes `SELECT * FROM documents` with no `WHERE` clause, PostgreSQL's engine transparently evaluates the policy and returns only rows belonging to that tenant."
 - 💡 **Aasaan Bhasha Mein:** RLS database ka automatic filter hai. Agar developer code me `WHERE tenant_id = ...` likhna bhool bhi jaye, tab bhi PostgreSQL database khud se sirf usi tenant ka data return karega jiska ID session variable me set hai.
+
+### Q3.7 ⭐ [HIGH PRIORITY] How do database COMMIT and ROLLBACK work under the hood? What happens to data during a ROLLBACK?
+- **How to Answer in an Interview:**
+  "Under PostgreSQL's MVCC and WAL architecture:
+  - **On `COMMIT`:** PostgreSQL writes a commit record to the **Write-Ahead Log (WAL)** on disk and issues an `fsync()` system call to ensure immediate physical persistence. It marks the transaction status as `COMMITTED` in the `pg_xact` status log.
+  - **On `ROLLBACK`:** PostgreSQL does **not** physically delete or erase the rows modified by the transaction from disk! Doing so would require costly disk rewrites. Instead, PostgreSQL simply writes an `ABORTED` status flag into `pg_xact`.
+  - Any subsequent query checking those rows inspects the row header's `xmin` (creator transaction ID). Seeing that `xmin` belongs to an aborted transaction, the engine treats the rows as invisible. The physical disk space is later reclaimed asynchronously by the **VACUUM** engine."
+- 💡 **Aasaan Bhasha Mein:** Rollback hone par Postgres hard drive se data erase nahi karta. Wo sirf transaction status ko 'ABORTED' mark kar deta hai taaki doosre log use na dekh sakein. Baad me background VACUUM us dead data ko saaf karta hai.
+
+### Q3.8 What are SAVEPOINTs, and when would you use nested transactions in FastAPI?
+- **How to Answer in an Interview:**
+  "A `SAVEPOINT` creates a named checkpoint inside an active database transaction, allowing the application to roll back a specific failed sub-operation without discarding the entire transaction.
+  - **Production Use Case:** In a complex order workflow (charge card $
+ightarrow$ deduct inventory $
+ightarrow$ award loyalty points): if awarding loyalty points fails, you don't want to abort the customer's purchase. You wrap the loyalty point insert in a `SAVEPOINT` (`async with session.begin_nested():`). If it throws an exception, SQLAlchemy rolls back strictly to the savepoint, leaving the outer purchase transaction intact to be committed."
+- 💡 **Aasaan Bhasha Mein:** Ek lambi transaction me savepoint lagane se agar koi choti optional cheez fail ho jaye, toh poora transaction cancel karne ke bajaye sirf us choti cheez ko rollback karke baaki poora order save kiya ja sakta hai.
+
+### Q3.9 Compare Pessimistic Locking (`SELECT ... FOR UPDATE`) vs Optimistic Locking: How do you prevent inventory overselling?
+- **How to Answer in an Interview:**
+  "- **Pessimistic Locking (`SELECT ... FOR UPDATE`):**
+    Acquires an exclusive row-level lock on the database record at the SQL engine level. Any other concurrent transaction attempting to read with `FOR UPDATE` or write to that row is blocked until the locking transaction commits.
+    *Best For:* High contention, mission-critical operations where retries are unacceptable (e.g. ticket booking, flash sales, financial wallet debits).
+  - **Optimistic Locking:**
+    Does not acquire locks. Adds an integer `version` or timestamp column. Updates check: `UPDATE products SET stock = stock - 1, version = version + 1 WHERE id = 1 AND version = 5;`. If rowcount is 0, the record was mutated by another user, and the application layer catches the conflict and retries.
+    *Best For:* Low contention, high-read environments (e.g. editing user profiles, CMS documents)."
+- 💡 **Aasaan Bhasha Mein:** Flash sale me aakhri 1 item bechne ke liye **Pessimistic (`FOR UPDATE`)** lagate hain taaki database row ko lock kar de aur 2 log ek sath na khareed sakein. Normal forms me **Optimistic (version check)** use karte hain jisme koi lock nahi lagta.
+
+### Q3.10 How do you implement the Unit of Work pattern in FastAPI to guarantee transaction safety?
+- **How to Answer in an Interview:**
+  "We implement Unit of Work using an async context manager wired into FastAPI's dependency injection (`get_db`).
+  - When a request enters, the context manager acquires a connection and opens a transaction via `async with session.begin():`.
+  - The service layer performs all mutations on that session.
+  - If the endpoint completes without error, the context manager automatically calls `await session.commit()`.
+  - If any uncaught exception occurs (e.g. `HTTPException(400)` or database error), the context manager automatically invokes `await session.rollback()`, ensuring that no partial, corrupted data ever persists in the database."
+- 💡 **Aasaan Bhasha Mein:** FastAPI me har request ke liye ek transaction context manager banta hai: agar endpoint successful raha toh automatically `commit()` ho jata hai, aur agar koi bhi error aaya toh automatically `rollback()` ho jata hai taaki database clean rahe.
+
+### Q3.11 ⭐ [HIGH PRIORITY] SQL vs NoSQL: When would you choose PostgreSQL over MongoDB, and when does MongoDB genuinely win?
+- **How to Answer in an Interview:**
+  "In modern full-stack development, PostgreSQL is my default choice because it handles structured relational tables AND semi-structured JSON via `JSONB` with GIN indexes.
+  - **Choose PostgreSQL when:**
+    - Data has complex relationships (Many-to-Many, multi-table joins).
+    - Multi-tenant data isolation requires engine-level Row-Level Security (RLS).
+    - Data integrity requires strict database-level foreign keys and ACID constraints.
+  - **Choose MongoDB when:**
+    - Data is deeply polymorphic (e.g. a catalog where laptops have 20 technical attributes and t-shirts have completely different color/size matrices).
+    - High-velocity append-only event streams that require native **horizontal sharding** across multiple clusters ($> 50,000$ writes/sec).
+    - Real-time reactive features using MongoDB **Change Streams** on the replica set `oplog`."
+- 💡 **Aasaan Bhasha Mein:** Default hamesha PostgreSQL rakho kyunki usme JSONB bhi milta hai aur ACID transactions bhi. MongoDB tab use karo jab schema poori tarah dynamic ho ya hazaron writes per second ko horizontal sharding se distribute karna ho.
+
+### Q3.12 How do you model One-to-Many relationships in MongoDB (Embedding vs Referencing)?
+- **How to Answer in an Interview:**
+  "The decision depends on relationship cardinality and query patterns:
+  1. **Embedding (Denormalization):** Use when the child documents are bounded (e.g. $< 100$ items, such as delivery addresses on a user profile or order line items). Benefit: 1 single database disk seek fetches parent and children atomically.
+  2. **Referencing (Normalization):** Use when the relationship is unbounded (e.g. a blog post with 20,000 comments or a server logging millions of events).
+     - *Constraint:* MongoDB enforces a strict **16MB maximum document size limit**. If you embed an unbounded array, the document will eventually hit 16MB and crash with `BSONObjectTooLarge`."
+- 💡 **Aasaan Bhasha Mein:** Agar data chota aur bounded hai (jaise user ke 2-3 addresses) toh embed karo taaki 1 query me sab mil jaye. Agar data badhta hi chala jayega (jaise comments ya logs) toh reference use karo warna 16MB document limit crash kar dega.
+
+### Q3.13 How does MongoDB's Aggregation Pipeline work, and what is the #1 optimization rule?
+- **How to Answer in an Interview:**
+  "The Aggregation Pipeline is a multi-stage data processing pipeline where documents flow through sequential transformations: `$match` (filter) $ightarrow$ `$unwind` (deconstruct array) $ightarrow$ `$group` (aggregate/sum) $ightarrow$ `$sort` $ightarrow$ `$project` (shape output).
+  - **The #1 Optimization Rule:** Always place **`$match` and `$sort` as the very first stages** of the pipeline so they can utilize B-tree indexes! If you place an `$unwind` or `$project` before `$match`, MongoDB cannot use indexes and must perform a full memory collection scan (`COLLSCAN`)."
+- 💡 **Aasaan Bhasha Mein:** Aggregation pipeline me `$match` aur `$sort` hamesha sabse pehle lagao taaki database index ka use kar sake. Agar pehle `$unwind` laga diya toh poora database memory me scan hoga aur query slow ho jayegi.
 
 ### Q3.7 How do you run zero-downtime database migrations when adding a `NOT NULL` column?
 - **How to Answer in an Interview:**
@@ -4583,6 +4977,27 @@ async def get_presigned_upload_url(
 
 52. **Who handles external asynchronous I/O in Node.js vs Python asyncio?**
     - Node.js uses `libuv` (kernel epoll/kqueue for sockets + thread pool for disk I/O); Python uses the `asyncio` selector or `uvloop` (C wrapper around libuv). File I/O in Python blocks the event loop unless run via `asyncio.to_thread()`.
+
+53. **What happens to data on disk during a database ROLLBACK?**
+    - PostgreSQL does not physically delete or erase the written row pages; it simply marks the transaction status as `ABORTED` in `pg_xact`. The rows are ignored by subsequent queries and later cleaned up by `VACUUM`.
+
+54. **When should you use Pessimistic Locking (`SELECT ... FOR UPDATE`)?**
+    - When contention is high and overselling or race conditions cannot be tolerated (e.g. flash sales, inventory booking, financial account balances).
+
+55. **What is the purpose of a SQL SAVEPOINT?**
+    - It creates a named checkpoint inside an active transaction, enabling partial rollback of a specific failed operation without aborting the entire transaction.
+
+56. **What is the maximum document size in MongoDB?**
+    - 16 Megabytes (BSON limit); prevents runaway memory allocation per document.
+
+57. **What is the difference between Embedding and Referencing in MongoDB?**
+    - Embedding stores nested sub-documents inside the parent document for fast single-seek reads; Referencing stores foreign `ObjectId` pointers in separate collections to avoid unbounded array bloat.
+
+58. **What does MongoDB Write Concern `w: "majority"` guarantee?**
+    - Guarantees that a write operation is confirmed only after being committed to a majority of replica set nodes, preventing data loss during Primary node failovers.
+
+59. **Why can PostgreSQL JSONB replace MongoDB in 80% of applications?**
+    - PostgreSQL `JSONB` supports nested document querying, GIN indexing, and json-path operators while maintaining strict relational foreign keys and multi-table ACID transactions.
 
 ---
 *End of Guide. Practice Part 5, Scenario 4 and Part 6 out loud before your technical interview!*
