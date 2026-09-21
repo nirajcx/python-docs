@@ -55,7 +55,18 @@
 - [PART 4 — CODING CHALLENGES (Prompts 1 to 7 with Evaluation Rubrics)](#part-4--coding-challenges)
 - [PART 5 — SYSTEM DESIGN SCENARIOS (Scenarios 1 to 4 with Detailed Request Flow Walkthrough)](#part-5--system-design-scenarios)
 - [PART 6 — BEHAVIORAL, LEADERSHIP & PROJECT DEEP DIVES (STAR Method)](#part-6--behavioral--leadership-questions)
-  - [Flagship Project Deep Dive: Siraaj (Onyx Fork)](#q1c-flagship-project-deep-dive-walk-me-through-your-flagship-project-siraaj-fork-of-onyx--what-does-it-do-and-what-was-your-exact-contribution)
+  - [Project Deep Dive 1: Veparix — Multi-Tenant ERP/CRM SaaS (Personal Product)](#project-deep-dive-1-veparix--multi-tenant-erpcrm-saas-personal-product)
+  - [Project Deep Dive 2: Siraaj — Enterprise AI Document Platform (Rihal, Oman)](#project-deep-dive-2-siraaj--enterprise-ai-document-platform-client-rihal-muscat-oman)
+  - [Project Deep Dive 3: Wishan — Cross-Platform Mobile App (Rihal, Oman)](#project-deep-dive-3-wishan--cross-platform-mobile-app-client-rihal-muscat-oman)
+  - [Project Deep Dive 4: Healthray — Hospital & Pharmacy Management SaaS](#project-deep-dive-4-healthray--hospital--pharmacy-management-saas-bigscal-domestic-project)
+  - [Project Deep Dive 5: SBI Pension Funds Portal](#project-deep-dive-5-sbi-pension-funds-portal-bigscal-domestic-project)
+  - [Project Deep Dive 6: Roommatik — Hotel Self-Service Kiosk & Contact-Center](#project-deep-dive-6-roommatik--hotel-self-service-kiosk--contact-center-internship-project)
+  - [Project Deep Dive 7: Local RAG Learning Pipeline](#project-deep-dive-7-local-rag-learning-pipeline-independent-ai-project-2026)
+  - [Section 3: Toughest Production Questions (Senior Grilling Round)](#3-the-toughest-production-questions-senior-grilling-round)
+    - [Siraaj: Event Loop Starvation, Keycloak Outages & SSE Disconnections](#siraaj-enterprise-ai-document-platform--rihal-muscat-oman)
+    - [Healthray: Deadlock Elimination & Offline Hospital Dispensing](#healthray-hospital--pharmacy-management-saas)
+    - [Wishan: AmwalPay Timeouts & Anti-Tampering](#wishan-cross-platform-mobile-app--rihal-muscat-oman)
+    - [SBI Pension Funds: Share Over-Allocation Race Condition](#sbi-pension-funds-portal-bigscal-domestic-project)
 - [PART 7 — QUICK-FIRE ROUND (20+ Rapid Drill Questions)](#part-7--quick-fire-round)
 
 ---
@@ -5196,6 +5207,751 @@ async def get_presigned_upload_url(
 
 ---
 
+
+
+---
+
+## 2. RESUME PROJECTS & EXPERIENCES: COMPREHENSIVE INTERVIEW MASTERY
+
+> 🎯 **Master Interview Context:**
+> Every question in this section is directly tailored to the real production systems and projects from your engineering journey.
+> When interviewers ask: *"Tell me about your background,"* *"How did you deploy your project?"*, *"What was your toughest bug?"*, or *"Which task are you most proud of?"*, these are your battle-tested, mathematically backed answers.
+
+---
+
+### Project Deep Dive 1: Veparix — Multi-Tenant ERP/CRM SaaS (Personal Product)
+
+#### 1. Project Overview & Architecture
+- **Stack:** React (Vite) + Redux Toolkit · FastAPI (Async, Pydantic v2, Dependency Injection) · PostgreSQL 16 · Prisma ORM · Redis 7 · Docker Compose · Nginx.
+- **The Real-World Context:**
+  - Designed as an end-to-end ERP/CRM system tailored for Indian manufacturing and trading MSMEs (Micro, Small & Medium Enterprises).
+  - Deployed on an **on-premise local PC / dedicated office machine** inside the client's office/factory network, with optional secure remote tunnel access.
+  - Developed rapidly with heavy assistance from modern AI coding tools (Cursor, Claude 3.5 Sonnet, Copilot), followed by rigorous manual engineering to stabilize the mission-critical core features so the business could reliably use it day-to-day.
+- **Scope (20+ Modular Features Scaffolding vs Production-Stabilized Core):**
+  - **Stabilized Core Workflows (In Active Daily Production Use):**
+    - **GST Invoicing & Billing Engine:** Indian statutory GST calculation (CGST + SGST for intra-state vs IGST for inter-state), automated HSN/SAC tax slab assignment, round-off compliance, customer tax ledger.
+    - **Warehouse Inventory & Batch Tracking:** Batch-level stock deduction, real-time stock availability, reorder alerts.
+    - **CRM Pipeline:** Lead management, deal stages, client contact directory, quotation generation.
+  - **Secondary Modules (Scaffolded with AI, Selectively Used or Feature-Flagged):**
+    - Basic MRP (Bill of Materials), HR/Attendance tracker, payroll estimates, expense logging.
+
+```
+                     [ Local Office Network / LAN ]
+           (Billing Counter 1, Counter 2, Warehouse Tablets)
+                                   │
+                                   ▼ (HTTP http://192.168.1.50 or http://veparix.local)
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│               DEDICATED LOCAL OFFICE PC / SERVER (Docker Compose)                      │
+│                                                                                        │
+│     [ Nginx Reverse Proxy (:80) ]                                                      │
+│        ├── /      ──► [ Frontend Container (React / Vite Static Build) ]               │
+│        └── /api/  ──► [ Backend Container (FastAPI + Uvicorn) ]                        │
+│                             │                                                          │
+│                             ├──► [ PostgreSQL 16 Container (Local Persistent Volume) ] │
+│                             └──► [ Redis 7 Container (Cache & Session) ]              │
+│                                                                                        │
+│     [ Cloudflare Tunnel / Tailscale (cloudflared) ] ── (Optional Remote Owner Access)   │
+└────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+#### 2. How You Deployed Veparix on a Local PC / On-Premise Office Machine
+> **The Exact Interview Question:** *"How did you deploy your personal project Veparix? Why deploy on a local PC instead of AWS/Cloud, and how did you set up Docker, networking, data persistence, and backups?"*
+
+##### Why On-Premise / Local PC for Indian MSMEs?
+"In India, small manufacturing units and trading businesses (textiles, packaging, auto parts in Surat/Gujarat) have three major operational constraints:
+1. **Zero Recurring Cloud Cost:** They are unwilling to pay $50–$100/month for AWS EC2/RDS and PaaS hosting for an internal business tool.
+2. **Zero Dependency on Internet Uptime:** In industrial areas, broadband internet fluctuates. If cloud goes down, physical truck dispatch and billing counter operations freeze completely!
+3. **Data Privacy & Control:** Business owners prefer their GST financial figures, supplier rates, and inventory to reside physically on an office machine rather than a third-party cloud.
+I therefore architected Veparix to run as a containerized stack on a dedicated local office desktop PC, accessible to all office billing counters over the local Wi-Fi / Ethernet LAN."
+
+##### The Step-by-Step Local PC Docker Deployment:
+1. **Dedicated Local Machine Setup:**
+   - Dedicated office desktop PC (Intel Core i5, 16GB RAM, 512GB SSD) running Ubuntu Linux / Windows 11 with Docker Desktop and WSL2.
+   - Assigned a static local IP on the office router: `192.168.1.50` (and configured local mDNS hostname `veparix.local`).
+2. **Local Multi-Container `docker-compose.yml`:**
+   ```yaml
+   version: '3.8'
+
+   services:
+     reverse-proxy:
+       image: nginx:alpine
+       container_name: veparix_local_proxy
+       restart: unless-stopped
+       ports:
+         - "80:80"       # Accessible across office LAN at http://192.168.1.50
+       volumes:
+         - ./nginx.conf:/etc/nginx/nginx.conf:ro
+       depends_on:
+         - frontend
+         - backend
+       networks:
+         - veparix_lan
+
+     frontend:
+       build:
+         context: ./frontend
+         dockerfile: Dockerfile
+       container_name: veparix_frontend
+       restart: unless-stopped
+       networks:
+         - veparix_lan
+
+     backend:
+       build:
+         context: ./backend
+         dockerfile: Dockerfile
+       container_name: veparix_backend
+       restart: unless-stopped
+       environment:
+         - DATABASE_URL=postgresql://veparix_admin:${DB_PASS}@db:5432/veparix_db
+         - REDIS_URL=redis://redis:6379/0
+         - JWT_SECRET=${JWT_SECRET}
+       depends_on:
+         db:
+           condition: service_healthy
+       networks:
+         - veparix_lan
+
+     db:
+       image: postgres:16-alpine
+       container_name: veparix_db
+       restart: unless-stopped
+       environment:
+         POSTGRES_USER: veparix_admin
+         POSTGRES_PASSWORD: ${DB_PASS}
+         POSTGRES_DB: veparix_db
+       volumes:
+         - veparix_pgdata:/var/lib/postgresql/data # Local persistent SSD storage
+       healthcheck:
+         test: ["CMD-SHELL", "pg_isready -U veparix_admin -d veparix_db"]
+         interval: 5s
+         retries: 5
+       networks:
+         - veparix_lan
+
+     redis:
+       image: redis:7-alpine
+       container_name: veparix_redis
+       restart: unless-stopped
+       networks:
+         - veparix_lan
+
+   networks:
+     veparix_lan:
+       driver: bridge
+
+   volumes:
+     veparix_pgdata:
+   ```
+3. **LAN Access Configuration (Nginx):**
+   ```nginx
+   server {
+       listen 80;
+       server_name _; # Accepts requests from 192.168.1.50, localhost, or veparix.local
+
+       location / {
+           proxy_pass http://frontend:80;
+           proxy_set_header Host $host;
+       }
+
+       location /api/ {
+           proxy_pass http://backend:8000;
+           proxy_set_header Host $host;
+           proxy_set_header X-Real-IP $remote_addr;
+           proxy_read_timeout 60s;
+       }
+   }
+   ```
+   Billing operators on any laptop, desktop, or mobile tablet connected to the factory Wi-Fi simply open `http://192.168.1.50` or `http://veparix.local` in their browser.
+4. **Optional Secure Remote Access (Cloudflare Tunnel):**
+   - When the business owner wants to check sales reports from home or mobile outside the office, instead of opening dangerous router port forwards on public IP, I configured a free **Cloudflare Tunnel (`cloudflared`)**.
+   - Outbound encrypted TLS tunnel to Cloudflare Edge: maps `https://erp.clientbusiness.com` directly to `http://localhost:80` with zero open router ports!
+5. **Local Automated Backup & Disaster Recovery:**
+   - Because it runs on a local PC, hardware crash or disk corruption is the #1 risk.
+   - Set up an automated daily script triggered via Task Scheduler / cron:
+     - Dumps PostgreSQL: `docker exec veparix_db pg_dump -U veparix_admin veparix_db | gzip > /backups/db_backup_$(date +%F).sql.gz`.
+     - Automatically copies the backup archive to a secondary external USB drive and syncs a compressed copy to a free Google Drive / S3 bucket.
+
+---
+
+#### 3. The Real AI-Assisted Engineering Story: What Worked, What Failed, and How You Made It Usable
+> **The Exact Interview Question:** *"You built 20+ modules as an independent project. How heavily did you use AI coding tools, what worked, what completely broke, and how did you get it production-ready for real users?"*
+
+- **The Honest, Senior Engineering Answer:**
+  "I don't claim to have manually hand-coded every single line of all 20 modules from scratch. I used modern AI tools (Cursor, Claude 3.5 Sonnet, GitHub Copilot) as a force multiplier to rapidly scaffold the application.
+  However, building with AI taught me the harsh difference between a **'demo that looks cool'** and a **'system that real businesses can run without losing money'**."
+
+##### 1. What AI Did Exceptionally Well (The 10x Boost):
+- **Boilerplate Scaffolding:** Generating initial Tailwind UI layouts, form inputs, modal dialogs, and table components.
+- **Pydantic Schemas & Types:** Converting sample GST invoice JSON objects into strongly-typed Pydantic v2 schemas and TypeScript interfaces.
+- **Standard CRUD APIs:** Basic GET/POST endpoints for simple entities (customer contacts, vendor addresses, category lists).
+
+##### 2. Where AI Failed Miserably (The Critical Breakdowns):
+1. **Total Blindness to Concurrency & Race Conditions:**
+   - AI generated simple code: `item.stock = item.stock - req.qty; await db.commit()`.
+   - When two operators billed simultaneously on the local network, this caused stock to become negative (`-2`) and duplicate GST invoice numbers to be issued. AI had zero concept of PostgreSQL row locks (`SELECT ... FOR UPDATE`).
+2. **Hallucinated ORM Relations & Broken Prisma Joins:**
+   - When modeling complex relationships (e.g. Invoices $\rightarrow$ Items $\rightarrow$ Batches $\rightarrow$ Tax Slabs), AI generated cyclic relations and invalid foreign key cascading rules in Prisma, causing migration crashes (`prisma migrate` failed).
+3. **State Desynchronization Across Complex Redux Slices:**
+   - AI generated Redux reducers with shallow state mutations, causing subtle bugs where updating inventory in the warehouse tab did not reflect on the active billing invoice draft.
+4. **Indian GST Statutory Tax Edge Cases:**
+   - AI struggled with statutory GST rules: handling rounding off to nearest rupee at item level vs invoice level, inter-state IGST vs intra-state CGST/SGST split, and Reverse Charge Mechanism (RCM).
+
+##### 3. The Pragmatic Triage — How You Made It Usable for Real Users:
+- **Ruthless Prioritization:**
+  "I realized that out of 20 theoretical modules, the business only cared deeply about **3 things**:
+  1. Can I generate a legally valid GST invoice in 15 seconds?
+  2. Does stock deduct accurately so I don't oversell physical inventory?
+  3. Can I track which customers owe me money (receivables)?
+- **What I Did:**
+  - I discarded AI-generated logic on the core paths and manually hand-wrote the **GST calculation engine** and **PostgreSQL pessimistic transaction locking**.
+  - I hardened the database constraints (`UNIQUE (tenant_id, financial_year, invoice_number)`) so bugs were impossible at the database level.
+  - For unstable secondary modules (like complex multi-level MRP production forecasting), I simplified the UI or hid them behind feature flags so users wouldn't encounter errors.
+  - I containerized the core with Docker on their local office PC, tested it with 100 sample invoices, and gave them a clean, fast web portal on their local network.
+  - **Result:** It was reliable, fast, solved their exact day-to-day bottleneck, and they are actively running their daily billing on it today!"
+
+> 💡 **Aasaan Bhasha Mein (Interview Speaking Script):**
+> *"Veparix ko maine Cursor aur Claude jaise AI tools ki help se develop kiya tha taaki 20 modules ka initial scaffolding aur UI jaldi ban sake. Lekin AI code me 30-40% cheezein production me break ho rahi thi: AI ne bina transaction lock ke naive stock update likh diya jisse concurrent billing me duplicate GST invoice number aur negative stock ho raha tha. Prisma ORM me circular relations bana diye. Maine realistic approach li: secondary modules ko simplify kiya aur core 3 modules (GST Invoicing, Inventory Batch Locking, aur Customer Ledger) ka logic manually hand-code karke Postgres me `SELECT ... FOR UPDATE` pessimistic lock lagaya. Client ke office me ek dedicated local PC par Docker se host kiya taaki unka koi cloud bill na aaye aur bina internet ke bhi billing chale. Ye system unke exact daily use-case ke liye rock-solid ban gaya aur wo aaj bhi ispe kaam kar rahe hain."*
+
+---
+
+#### 4. Toughest Nightmare Task on Veparix: The Multi-Tenant GST Invoicing & Inventory Race Condition
+*(Refer to Section 3 above for full technical breakdown of the Section 31 Indian CGST Act compliance fix and atomic `UPDATE ... RETURNING` sequence counter).*
+
+---
+
+### Project Deep Dive 2: Siraaj — Enterprise AI Document Platform (Client: Rihal, Muscat, Oman)
+
+#### 1. Project Context & Remote International Collaboration
+- **Client:** Rihal (Muscat, Oman) — Remote international client engagement.
+- **Candidate Role:** Full-Stack Software Engineer owning async FastAPI backend endpoints, Keycloak/OIDC enterprise auth, and responsive Next.js frontend features.
+- **Collaboration Dynamics:**
+  - Successfully collaborated across time zones (Gulf Standard Time GMT+4 and IST).
+  - Participated in remote agile ceremonies, asynchronous code reviews on Azure DevOps/GitHub, and direct technical alignment with Rihal's in-house AI and platform teams.
+  - Adhered to enterprise data protection and cross-border security compliance standards.
+
+#### 2. Key Technical Contributions
+1. **Keycloak / OIDC Enterprise Authentication & Authorization:**
+   - Implemented OAuth2 Authorization Code Flow with PKCE for single sign-on (SSO).
+   - FastAPI dependency injection layer verifying JWT tokens against Keycloak's public JWKS endpoint:
+     ```python
+     # Cached JWKS token verification in FastAPI
+     from fastapi import Depends, HTTPException, Security
+     from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+     import jwt
+     from async_lru import alru_cache
+
+     security = HTTPBearer()
+
+     @alru_cache(maxsize=1, ttl=3600)
+     async def get_keycloak_jwks():
+         async with httpx.AsyncClient() as client:
+             res = await client.get("https://auth.rihal.om/realms/siraaj/protocol/openid-connect/certs")
+             return res.json()
+
+     async def get_current_user(credentials: HTTPAuthorizationCredentials = Security(security)):
+         token = credentials.credentials
+         jwks = await get_keycloak_jwks()
+         try:
+             unverified_header = jwt.get_unverified_header(token)
+             key = next(k for k in jwks["keys"] if k["kid"] == unverified_header["kid"])
+             payload = jwt.decode(
+                 token,
+                 jwt.algorithms.RSAAlgorithm.from_jwk(key),
+                 algorithms=["RS256"],
+                 audience="siraaj-web",
+                 options={"verify_exp": True}
+             )
+             return payload
+         except Exception as e:
+             raise HTTPException(status_code=401, detail="Invalid or expired SSO token")
+     ```
+2. **Next.js (App Router, Server Components & SSR) Performance Optimization:**
+   - Heavy document viewer components (PDF rendering, citation inspector) were causing large initial JS bundle sizes.
+   - Implemented dynamic code-splitting via `next/dynamic` with SSR disabled for browser-only canvas rendering, reducing initial page load bundle size by **42%**.
+   - Leveraged React Server Components (RSC) to fetch document metadata directly on the server, sending zero client-side JavaScript for document lists.
+3. **CORS & Cross-Service Integration Triage:**
+   - Resolved complex CORS preflight issues between Next.js client, FastAPI gateway, and dedicated internal vector ingestion microservices.
+   - Configured custom proxy rewrite rules in `next.config.js` to route internal AI inference requests seamlessly without exposing backend microservices to public CORS vectors.
+
+#### 3. Toughest Nightmare Task on Siraaj
+*(Refer to Part 6, Q2: The Cross-Subdomain Auth & Safari Cookie Breakdown 2 Hours Before Enterprise Launch. Safari ITP cookie dropping on custom subdomains diagnosed and resolved under 90 minutes).*
+
+#### 4. Proud-Of Task on Siraaj
+*(Refer to Part 6, Q1: S3 Pre-signed streaming ingestion engine + Celery workers dropping TTFT from 6s to <600ms).*
+
+---
+
+### Project Deep Dive 3: Wishan — Cross-Platform Mobile App (Client: Rihal, Muscat, Oman)
+
+#### 1. Project Context & Tech Stack
+- **Client:** Rihal, Muscat, Oman.
+- **Domain:** Consumer & enterprise cross-platform mobile app (iOS & Android).
+- **Stack:** React Native (TypeScript) · Golang REST API backend · AmwalPay Payment Gateway (Oman).
+
+```
+[ React Native Mobile App (iOS / Android) ]
+       │
+       ├── 1. Initiate Order (POST /api/v1/orders) ──► [ Golang REST API ]
+       │                                                      │
+       │                                     2. Create AmwalPay Session
+       │                                                      ▼
+       ├── 3. Open 3DS WebView ◄────────────────── [ AmwalPay Gateway ]
+       │   (User enters Card / OTP)                           │
+       │                                                      │
+       ├── 4. Deep Link Redirect (wishan://payment/callback) │
+       │                                                      ▼
+       └── 5. Polling Fallback ◄── 6. Asynchronous Webhook Verification
+```
+
+---
+
+#### 2. AmwalPay Payment Gateway Integration (Oman FinTech)
+> **The Interview Question:** *"How did you integrate AmwalPay in React Native, and how did you handle 3D-Secure authentication and mobile payment redirects?"*
+
+1. **Payment Initiation Flow:**
+   - The React Native client calls the Golang backend `/api/v1/payments/initiate` with an `idempotency_key` and order details.
+   - The Golang backend communicates with AmwalPay's API, creates a transaction session, and returns a secure `payment_url` with transaction reference.
+2. **In-App 3D-Secure Card Verification:**
+   - React Native opens the `payment_url` inside an in-app `WebView` (`react-native-webview`), allowing the user to complete OTP verification directly from their Omani bank (e.g. Bank Muscat, Bank Dhofar).
+   - Configured custom navigation interceptors inside the WebView (`onNavigationStateChange`) to intercept the AmwalPay return URL (`wishan://payment/callback?status=SUCCESS&txRef=...`).
+3. **Deep Linking Configuration:**
+   - Configured native Android `intent-filter` in `AndroidManifest.xml` and iOS URL Schemes in `Info.plist` for `wishan://`.
+   - Listened to incoming URLs via `Linking.addEventListener('url', handlePaymentRedirect)`.
+
+---
+
+#### 3. Toughest Nightmare Task on Wishan: "The Zombie Payment Bug" (Android Low-Memory App Kill)
+> **The Interview Question:** *"What was your hardest mobile debugging challenge on Wishan?"*
+
+- **The Crisis:**
+  "Users on budget and mid-tier Android devices (2GB–3GB RAM) experienced a frustrating bug: they would initiate a payment, receive an SMS with an OTP from their bank, switch apps to check the SMS or their banking app, enter the OTP in the AmwalPay WebView, and upon completion, the app would restart from scratch! The deep link was lost, the order screen showed 'Payment Pending or Failed', yet their bank account had been debited in OMR (Omani Rials). Customers flooded support claiming the app took their money without delivering the service."
+- **Root-Cause Analysis:**
+  "On memory-constrained Android devices, when a user backgrounds the app to open their SMS or banking app, the Android OS **Low Memory Killer (LMK)** aggressively terminates the background Wishan process to reclaim RAM. When the bank finishes 3D-Secure and tries to deep-link back to `wishan://`, Android cold-boots the app. Because the in-memory React state was wiped out upon termination, the app had no memory of the active transaction and redirected the user to the default home screen!"
+- **The Solution (3-Tier Resilient Reconciliation Architecture):**
+  1. **Persistent Local Transaction Journal (MMKV):**
+     Before opening the payment WebView, the transaction ID, order reference, and timestamp are written to persistent, synchronous native storage (`react-native-mmkv`):
+     ```typescript
+     // Save intent to disk before redirecting to bank
+     paymentStorage.set('pending_transaction', JSON.stringify({
+       orderId: order.id,
+       txRef: transactionRef,
+       timestamp: Date.now()
+     }));
+     ```
+  2. **App Cold-Start Reconciliation Listener:**
+     On application mount (`App.tsx`), an initialization hook checks for any pending transaction:
+     ```typescript
+     useEffect(() => {
+       const checkPendingPayment = async () => {
+         const raw = paymentStorage.getString('pending_transaction');
+         if (raw) {
+           const { orderId, txRef, timestamp } = JSON.parse(raw);
+           // If transaction is less than 30 minutes old, verify with Golang backend
+           if (Date.now() - timestamp < 30 * 60 * 1000) {
+             navigation.navigate('PaymentVerifyingScreen', { orderId, txRef });
+           } else {
+             paymentStorage.delete('pending_transaction');
+           }
+         }
+       };
+       checkPendingPayment();
+     }, []);
+     ```
+  3. **Webhook-First Source of Truth on Golang Backend:**
+     Never rely on the mobile client's redirect as proof of payment!
+     - The Golang backend listens to AmwalPay's asynchronous server-to-server webhook.
+     - Upon receiving the verified HMAC webhook from AmwalPay, Golang updates the database status to `PAID`.
+     - When the cold-booted mobile app queries `/api/v1/orders/{id}/status`, the backend immediately confirms the order is fulfilled.
+- **Outcome:**
+  - Zero dropped orders and zero orphan transactions, even if the Android OS killed the app 10 times in the background.
+  - Customer support payment complaints dropped by **100%**.
+
+> 💡 **Aasaan Bhasha Mein (Speaking Script):**
+> *"Wishan app me AmwalPay payment gateway integrate karte waqt ek ajeeb bug aaya: low-RAM Android phones me jab user OTP dekhne ke liye SMS app me switch karta tha, toh Android OS hamari app ko background me kill kar deta tha! Jab payment complete hoti aur app wapas khulti toh app restart ho jati aur payment 'Failed' dikhati jabki bank se paise cut chuke the. Maine ise 3-tier solution se fix kiya: pehle payment shuru hote hi transaction state ko persistent storage (MMKV) me save kiya. App start hote hi check kiya ki koi pending transaction toh nahi hai. Aur backend par Golang me AmwalPay ka webhook listener lagaya jisse bank directly hamare server ko confirm kare chahe mobile app band ho ya chal rahi ho."*
+
+---
+
+#### 4. Proud-Of Task on Wishan: High-Reliability Bilingual In-App Payment Experience
+- Built a seamless, accessible payment checkout flow supporting English and Arabic (RTL layout) with native animations.
+- Achieved a **99.4% payment completion rate** across thousands of production checkout sessions in Oman.
+
+---
+
+### Project Deep Dive 4: Healthray — Hospital & Pharmacy Management SaaS (Bigscal Domestic Project)
+
+#### 1. Project Context & Domain Complexity
+- **Domain:** Hospital & Pharmacy SaaS deployed across multiple hospital branches.
+- **Key Modules Built:**
+  - Real-time inventory tracking across central stores and pharmacy counters.
+  - Batch and Expiry management enforcing strict **FEFO (First Expired, First Out)** dispensing.
+  - Automated reorder thresholds and low-stock alerts.
+  - E-prescription handling and barcode-based dispensing.
+  - GST-compliant billing with Insurance / Third-Party Administrator (TPA) claim processing.
+  - Multi-branch analytics dashboards for inventory turnover, sales, and profit margins.
+
+---
+
+#### 2. Toughest Nightmare Task on Healthray: The Double-Dispensing & Expired Batch Concurrency Crisis
+> **The Interview Question:** *"What was the most challenging technical problem you solved on Healthray?"*
+
+- **The Crisis:**
+  "During the 9:00 AM to 11:00 AM peak outpatient rush, 4 pharmacy billing counters were operating simultaneously. Pharmacists at Counter 1 and Counter 3 both scanned and billed the same high-demand antibiotic (*Augmentin 625mg*). The inventory showed 4 boxes available in Batch #AUG-901. Counter 1 billed 3 boxes and Counter 3 billed 3 boxes. Both bills were generated successfully, but the physical stock only had 4 boxes! The physical inventory was short by 2 boxes, and worse, the system allowed older expired medicine batches to sit undetected on shelves because operators were manually picking whichever box was closest to them."
+- **Root-Cause Analysis:**
+  1. *Unsynchronized Read-Modify-Write:* The backend read `stock = 4`, checked `4 >= 3 (True)`, and updated stock. Concurrent database queries without row-level locks allowed both transactions to pass the condition simultaneously.
+  2. *Lack of FEFO Enforcement:* The dispensing algorithm relied on manual selection instead of forcing system-directed picking based on earliest expiration date.
+- **The Solution:**
+  1. **Strict FEFO (First Expired, First Out) Database Locking Query:**
+     Enforced that medicines must be deducted from the nearest-expiry valid batch, locked atomically at the database level:
+     ```sql
+     -- Atomic FEFO Batch Allocation with Pessimistic Locking
+     SELECT id, batch_number, stock_quantity, expiry_date
+     FROM pharmacy_batches
+     WHERE medicine_id = :med_id 
+       AND stock_quantity > 0
+       AND expiry_date > CURRENT_DATE
+     ORDER BY expiry_date ASC
+     FOR UPDATE;  -- Locks the matching batch rows exclusively until transaction commits
+     ```
+  2. **Multi-Batch Split Allocation Logic:**
+     If Counter 1 requests 6 units and the earliest expiring batch only has 4 units, the algorithm atomically allocates 4 units from Batch A and the remaining 2 units from the next-expiring Batch B in a single ACID transaction.
+  3. **Real-Time WebSocket Stock Broadcaster:**
+     When any batch stock drops below 5 units, a real-time WebSocket event (`STOCK_UPDATED`) is pushed to all active POS counters, immediately disabling the medicine from other pharmacists' UI search results.
+  4. **Hardware USB HID Barcode Scanner Integration:**
+     Integrated hardware USB 2D barcode scanners. Pharmacists scan the 2D DataMatrix barcode on the medicine strip, which encodes `(01)GTIN + (17)EXPIRY + (10)BATCH + (21)SERIAL`. The React UI automatically validates that the scanned physical box matches the exact batch assigned by the FEFO algorithm, eliminating human picking errors.
+- **Outcome:**
+  - Dispensing errors and stock discrepancy rate dropped from **6.4% to 0%**.
+  - Expired medicine write-offs dropped by **84%**, saving hospital branches lakhs of rupees annually.
+  - Zero negative-inventory incidents across 25+ hospital branches.
+
+> 💡 **Aasaan Bhasha Mein (Speaking Script):**
+> *"Healthray me hospital pharmacy ka sabse dangerous problem tha concurrent dispensing: subah ke OPD rush me do counter wale ek hi antibiotic batch ko ek saath sell kar dete the, jisse physical stock khatam ho jata tha aur inventory negative ho jati thi! Saath hi purani expiry wali medicines piche chhut jati thi. Maine ise resolve kiya: backend me strict FEFO (First Expired, First Out) algorithm lagaya jisme `ORDER BY expiry_date ASC FOR UPDATE` pessimistic lock use hota hai. Agar ek batch me kam stock ho toh system automatically agle batch se split kar leta hai. Saath hi 2D barcode scanner integration kiya jisse pharmacist jo physical strip scan karega, system check karega ki wahi nearest expiry batch hai ya nahi."*
+
+---
+
+#### 3. Proud-Of Task on Healthray: High-Speed Barcode Dispensing & GST/TPA Billing Engine
+- Designed the POS billing interface using React and Redux Toolkit with hotkey navigation (complete keyboard-driven operation without touching the mouse).
+- Automated the complex split calculation: Patient Co-pay vs Insurance / TPA approval vs GST (CGST/SGST).
+- **Impact:** Reduced patient checkout queue time from **4.5 minutes to under 45 seconds per bill**, increasing pharmacy revenue throughput by **300%** during morning OPD rushes.
+
+---
+
+### Project Deep Dive 5: SBI Pension Funds Portal (Bigscal Domestic Project)
+
+#### 1. Project Context & Objectives
+- **Client/Project:** SBI Pension Funds Portal — Financial services portal.
+- **Candidate Role:** Frontend & Component Architecture overhaul, full flow re-plan, ongoing maintenance and bug fixes.
+- **Challenges:** Legacy spaghetti architecture, slow render times, frequent session dropouts, and complex multi-step financial forms filled by elderly citizens with low tech literacy.
+
+---
+
+#### 2. Toughest Nightmare Task on SBI Pension Funds: State Loss on Multi-Step Pension Forms & Session Timeouts
+> **The Interview Question:** *"What was your toughest bug or UX challenge on the SBI Pension Funds Portal?"*
+
+- **The Crisis:**
+  "Pensioners (typically senior citizens aged 60+) spent 25–30 minutes carefully filling out multi-step pension nomination forms, entering 12-digit Aadhaar numbers, PAN cards, bank account details, and percentage share allocations for 4–5 nominees. Due to strict financial security policies, the backend invalidated sessions after 15 minutes of inactivity. When a pensioner reached Step 5 and clicked 'Save and Continue', they were redirected to the login screen, their session was terminated, and **all 5 pages of filled form data were completely wiped out**! The portal received hundreds of complaints daily from frustrated senior citizens."
+- **The Solution (Encrypted Client-Side Auto-Save & Session Hydration):**
+  1. **Encrypted Client-Side Draft Storage (`IndexedDB` + Web Crypto API):**
+     Instead of losing data on page unload, form state was saved after every input blur into `IndexedDB` encrypted client-side using a session-derived key. Sensitive data was never stored in unencrypted `localStorage`.
+  2. **Proactive Idle Warning Modal with Background Token Refresh:**
+     Built an idle-tracker hook (`useIdleTimer`): after 12 minutes of inactivity, an accessible modal appeared with large typography: *"Your session will expire in 3 minutes. Click anywhere to stay logged in."* Clicking the modal or typing triggered a silent background refresh call to `/api/v1/auth/refresh-token`, extending the session without interrupting the user.
+  3. **Zero-Data-Loss Form Re-Hydration:**
+     Even if the computer shut down or the session truly expired, once the user re-authenticated via OTP/login, the portal detected the encrypted draft in `IndexedDB`, decrypted it, and asked: *"Would you like to resume your pension application where you left off?"*, restoring all steps and values.
+- **Outcome:**
+  - Form abandonment rate dropped by **45%**.
+  - User support tickets regarding lost application data dropped to **zero**.
+
+> 💡 **Aasaan Bhasha Mein (Speaking Script):**
+> *"SBI Pension Funds portal me sabse bada pain point tha ki senior citizens 30 minute lagakar pension nomination form bharte the, lekin banking session 15 minute me timeout ho jata tha aur unka pura bhara hua data delete ho jata tha! Maine ise solve kiya: pehle Web Crypto API aur `IndexedDB` use karke client-side encrypted draft save banaya. Saath hi ek `useIdleTimer` hook lagaya jo 12 minute par pop-up dekar background me token refresh kar leta tha. Agar browser band bhi ho jaye, toh re-login karne par system wahi se form restore kar deta tha."*
+
+---
+
+#### 3. Proud-Of Task on SBI Pension Funds: Enterprise Accessibility & Component Architecture Overhaul
+- Refactored legacy monolithic jQuery/HTML pages into a modular, reusable React component architecture with Tailwind CSS.
+- Implemented **WCAG 2.1 AA accessibility standards**: high-contrast color modes, dynamic font resizing (A+ / A- buttons), ARIA labels for screen readers, and full keyboard navigation.
+- Reduced initial page load time by **60%** (from 4.2s down to 1.6s).
+
+---
+
+### Project Deep Dive 6: Roommatik — Hotel Self-Service Kiosk & Contact Center (Internship Project)
+
+#### 1. Project Context & Conversion
+- **Role:** Software Engineer Intern (React.js) at Bigscal Technologies (converted to full-time offer based on high performance).
+- **Domain:** Hotel self-service check-in kiosk web application, online guest check-in portal, and hotel admin panel.
+- **Stack:** React, React Bootstrap, Tailwind CSS, Redux, integration with hotel Property Management Systems (PMS) and electronic door lock hardware encoders.
+
+---
+
+#### 2. Toughest Nightmare Task on Roommatik: Kiosk Hardware Jam Midway Through Key Card Encoding
+> **The Interview Question:** *"What was the hardest technical challenge during your Roommatik project?"*
+
+- **The Crisis:**
+  "A guest arrived at 2:00 AM at a boutique hotel, used the Roommatik kiosk, paid for their reservation via credit card, and the kiosk began dispensing the physical RFID room key card. Midway through issuance, the physical card dispenser jammed or the RFID encoder timed out. The kiosk screen froze, the credit card was already charged, but the guest had no room key card to enter their room in the middle of the night!"
+- **The Solution (Two-Phase Hardware Commit & Graceful Fallback State Machine):**
+  1. **Two-Phase Commit State Machine:**
+     Separated the check-in lifecycle into distinct states: `PAYMENT_CAPTURED`, `ENCODING_KEY`, `DISPENSING_KEY`, and `COMPLETED`.
+  2. **Hardware Dispenser Telemetry Polling:**
+     The kiosk software interacted with a local C# hardware bridge via WebSocket. Only when the physical optical sensor confirmed the guest physically pulled the card from the slot did the state transition to `COMPLETED`.
+  3. **Automated Digital Fallback & Front-Desk Alert:**
+     If the hardware bridge returned a timeout or jam error:
+     - The kiosk did NOT show a generic error screen.
+     - It automatically called the PMS API to generate a temporary 6-digit numeric keypad door PIN and sent it via SMS and email to the guest's phone: *"Card dispenser temporary issue. Your Room 304 PIN is 482910."*
+     - Simultaneously dispatched an emergency WebSocket alert to the night-audit staff dashboard and logged the hardware event for technician repair.
+- **Outcome:**
+  - Zero guests left stranded without room access.
+  - Demonstrated senior-level systems thinking during internship, leading to direct full-time conversion.
+
+> 💡 **Aasaan Bhasha Mein (Speaking Script):**
+> *"Roommatik kiosk me sabse critical issue tha hardware failure: guest ne payment kar di, lekin RFID card encoder jam ho gaya aur card bahar nahi aaya! Raat ke 2 baje guest bina key ke khada tha. Maine ise two-phase hardware state machine se fix kiya: jab tak optical sensor card pull hone ka signal na de, tab tak booking complete nahi maani jaati. Agar dispenser jam ho jaye, toh system error dikhane ke bajaye turant PMS API se 6-digit electronic door PIN generate karke guest ke mobile par SMS kar deta tha aur hotel staff ko alert bhej deta tha."*
+
+---
+
+### Project Deep Dive 7: Local RAG Learning Pipeline (Independent AI Project, 2026)
+
+#### 1. Architecture & First-Principles Implementation
+- **Goal:** Deeply master enterprise RAG mechanics from first principles without relying on high-level black-box wrappers like LangChain.
+- **Stack:** Local LLMs via **Ollama** (Llama 3 8B, Mistral 7B) running in Docker · Vector Databases: **ChromaDB** and **Qdrant** · Backend: **FastAPI** with OpenAI-compatible SDK · Embeddings: `nomic-embed-text` and `all-MiniLM-L6-v2`.
+
+```
+[ User Query ] ──► [ FastAPI Backend ]
+                           │
+             ┌─────────────┴─────────────┐
+             ▼                           ▼
+[ Embed Query via Ollama ]      [ Qdrant / ChromaDB ]
+(nomic-embed-text)              (HNSW Index Vector Search)
+             │                           │
+             └─────────────┬─────────────┘
+                           ▼
+             [ Assembled Prompt with Chunks ]
+                           │
+                           ▼
+             [ Local LLM Stream (Ollama Llama 3) ]
+```
+
+#### 2. Key Learnings & Interview Talking Points
+1. **Chunking Strategies Compared:**
+   - *Fixed-size chunking (e.g. 500 characters):* Cuts sentences in half, ruining semantic meaning.
+   - *Recursive Character Text Splitting:* Splits by paragraphs `\n\n`, then sentences `\n`, then words, preserving semantic context. Optimal sweet spot: 512 tokens with 50-token overlap.
+2. **Embedding Models (Local vs Cloud):**
+   - `nomic-embed-text` running locally via Ollama produces 768-dimensional embeddings in ~35ms on GPU, ensuring **100% data privacy** with zero API costs.
+3. **Vector Distance Metrics:**
+   - *Cosine Similarity:* Best for normalized embeddings (focuses on angle/semantic meaning regardless of text length).
+   - *Dot Product:* Faster computationally when vectors are pre-normalized to unit length ($L_2$ norm).
+   - *Euclidean (L2):* Measures absolute distance in geometric space.
+
+---
+
+
+
+---
+
+## 3. THE TOUGHEST PRODUCTION QUESTIONS (SENIOR GRILLING ROUND)
+
+> 🎯 **Master Interview Context:**
+> In senior full-stack rounds for client enterprise platforms (like **Siraaj**, **Healthray**, **Wishan**, and **SBI Pension Funds**), hiring managers and principal architects will intentionally push you to your absolute breaking point with deep production edge cases, distributed failure modes, and race conditions.
+> Below are the hardest, real-world grilling questions you will face, along with exact architectural answers.
+
+---
+
+### Siraaj (Enterprise AI Document Platform — Rihal, Muscat, Oman)
+
+#### Hard Q1: Async Event Loop Starvation & CPU-Bound RAG Processing
+- **The Grilling Question:**
+  *"FastAPI runs on a single-threaded asynchronous event loop (uvicorn/asyncio). When 50 enterprise users simultaneously upload and query 300-page PDF documents, chunking text, extracting metadata, and calculating token counts are heavily CPU-bound. If your Python code executes a synchronous loop over 500,000 words, it will monopolize the OS thread and freeze the event loop. Every other concurrent HTTP request (including healthchecks and logins) will hang and time out with HTTP 504. How did you prevent CPU-bound RAG tasks from starving the event loop in Siraaj?"*
+- **The Senior Architectural Answer:**
+  1. **Strict Separation of I/O-Bound vs CPU-Bound Operations:**
+     - I/O operations (fetching documents from S3, calling Keycloak OIDC, querying PostgreSQL via asyncpg) use native `async/await` and never block the loop.
+     - Any CPU-bound parsing (e.g. PDF text extraction via `pypdf`, chunk splitting, regex sanitation) must NEVER run directly in an async route function.
+  2. **Worker Pool Execution (`asyncio.to_thread` vs `ProcessPoolExecutor`):**
+     - For lightweight CPU bursts: Dispatched execution to Python's internal thread pool using `await asyncio.to_thread(cpu_bound_function, data)`. Because Python's Global Interpreter Lock (GIL) limits multi-threading, this works only if the underlying library releases the GIL (e.g. C-extensions like `orjson` or NumPy).
+     - For heavy PDF text parsing and embeddings: Offloaded completely out-of-process to **Celery worker containers** running on a separate Docker container pool via Redis queues. The FastAPI route handler simply returns an immediate `HTTP 202 Accepted` with a `task_id`, keeping the FastAPI event loop latency at **< 15ms**!
+  3. **Event Loop Monitoring:**
+     - Enabled `asyncio` debug mode in staging (`PYTHONASYNCIODEBUG=1`) and set `loop.slow_callback_duration = 0.05` (50ms) to automatically log any blocking synchronous function that held the loop for longer than 50ms.
+
+---
+
+#### Hard Q2: Keycloak OIDC Outage, Token Jitter & Latency Spike
+- **The Grilling Question:**
+  *"Your FastAPI backend uses Keycloak for SSO authentication. If the Keycloak server experiences a 5-second latency spike, network partition, or temporarily crashes, does every incoming request to your API fail? If you validate JWTs by calling Keycloak's token introspection endpoint on every request, you've created a single point of failure that multiplies API latency. How did you design resilient token validation in Siraaj?"*
+- **The Senior Architectural Answer:**
+  1. **Asymmetric Local Cryptographic Verification (Zero Network Overhead):**
+     - Never use Keycloak's `/token/introspect` endpoint for standard API requests; introspection forces a blocking network HTTP roundtrip on every single API call!
+     - Instead, use **RS256 Asymmetric Verification**: Keycloak signs JWTs with its private RSA key. FastAPI verifies the signature locally using Keycloak's public key (JWKS - JSON Web Key Set). Local verification takes **< 0.5 milliseconds** and requires zero network calls to Keycloak.
+  2. **In-Memory JWKS Caching with Stale-While-Revalidate:**
+     - Keycloak's public keys (`/certs`) are fetched once and cached in FastAPI application memory with a 24-hour TTL using `@alru_cache`:
+       ```python
+       @alru_cache(maxsize=1, ttl=86400)
+       async def get_jwks():
+           async with httpx.AsyncClient(timeout=3.0) as client:
+               return (await client.get(KEYCLOAK_JWKS_URL)).json()
+       ```
+  3. **Handling Key Rotation & Keycloak Outages:**
+     - If an incoming JWT contains a key ID (`kid`) not present in the local cache (indicating Keycloak rotated its keys), FastAPI invalidates the cache and attempts a single retry fetch.
+     - If Keycloak is completely down or unreachable, FastAPI continues validating incoming requests using the existing cached public keys until their expiration timestamp (`exp`), ensuring zero downtime for already-logged-in enterprise users.
+
+---
+
+#### Hard Q3: The Cross-Service CORS & Reverse Proxy Breakdown
+- **The Grilling Question:**
+  *"You mentioned diagnosing and resolving CORS and cross-service integration issues between Next.js, FastAPI, and internal AI services. Walk me through the exact network anatomy of why preflight requests were failing, how browser cookie domain policies caused Safari to reject sessions, and how you debugged it step-by-step."*
+- **The Senior Architectural Answer:**
+  1. **The Anatomy of the Preflight Failure:**
+     - Next.js ran on `https://app.siraaj.rihal.om`, and the FastAPI backend was hosted on `https://api.siraaj.rihal.om`.
+     - When the client sent a POST request with custom headers (`Authorization: Bearer ...` and `Content-Type: application/json`), the browser initiated an HTTP `OPTIONS` preflight request.
+     - The FastAPI gateway was behind an upstream Nginx proxy. Nginx was configured with `proxy_intercept_errors on` and returned a generic `403 Forbidden` for `OPTIONS` requests that lacked an authentication header before the request ever reached FastAPI's `CORSMiddleware`!
+  2. **The Safari ITP (Intelligent Tracking Prevention) Cookie Rejection:**
+     - Authentication cookies issued by `api.siraaj.rihal.om` with `SameSite=Strict` were dropped by Safari when users navigated from `app.siraaj.rihal.om` because Safari considered different subdomains as cross-site during top-level navigations.
+  3. **The Step-by-Step Triage:**
+     - Step 1: Used `curl -i -X OPTIONS -H "Origin: https://app.siraaj.rihal.om" -H "Access-Control-Request-Method: POST" https://api.siraaj.rihal.om/api/v1/chat` to inspect the raw response headers directly, isolating whether the rejection occurred at Nginx or FastAPI.
+     - Step 2: Configured Nginx to explicitly handle `OPTIONS` requests by returning `HTTP 204 No Content` with appropriate CORS headers (`Access-Control-Allow-Origin`, `Access-Control-Allow-Credentials: true`).
+     - Step 3: Updated FastAPI cookie attributes to `domain=".rihal.om"` (wildcard parent domain) and `samesite="lax"` to guarantee seamless cookie attachment across all client subdomains in Safari and Chrome.
+
+---
+
+#### Hard Q4: LLM Token Streaming (SSE) Disconnection & Cost Leaks
+- **The Grilling Question:**
+  *"When streaming LLM answers via Server-Sent Events (SSE), what happens if the user closes their browser tab or clicks 'Stop Generating' after 2 seconds of a 20-second response? Does your backend continue invoking the LLM model in the background, consuming enterprise GPU memory or OpenAI API tokens? How did you detect client disconnections in FastAPI?"*
+- **The Senior Architectural Answer:**
+  1. **The Danger of Orphaned Generators:**
+     - In FastAPI, if you write an `EventSourceResponse(generator())` without monitoring connection state, Python will continue iterating through the generator until completion even after the client TCP socket is closed, burning API tokens and holding backend memory.
+  2. **The Disconnection Detection Hook:**
+     - In FastAPI, the `Request` object exposes an asynchronous method `await request.is_disconnected()`.
+     - Inside the streaming generator, we check client connection state on every single token iteration:
+       ```python
+       async def stream_rag_tokens(request: Request, prompt: str):
+           async for token in llm_client.astream(prompt):
+               if await request.is_disconnected():
+                   logger.warning("Client disconnected. Aborting LLM generation.")
+                   # Cancel upstream LLM task / close connection
+                   break
+               yield {"data": token}
+       ```
+  3. **Cancellation Token Propagation:**
+     - Wrapped the upstream LLM streaming task in an `asyncio.Task`. When client disconnection is detected, we call `task.cancel()`, which sends an immediate `AbortSignal` to the external LLM provider, saving hundreds of dollars in wasted token costs.
+
+---
+
+### Healthray (Hospital & Pharmacy Management SaaS)
+
+#### Hard Q1: High-Contention Database Deadlocks in Multi-Batch Medicine Dispensing
+- **The Grilling Question:**
+  *"In Healthray, you implemented pessimistic row locks (`SELECT ... FOR UPDATE`) to prevent overselling medicine batches. However, pessimistic locking across multiple rows is notorious for causing database DEADLOCKS (`SQLSTATE 40P01`). For example:
+  - Counter 1 bills Prescription 1 containing Medicine A and Medicine B (locks A, waits for B).
+  - Counter 2 bills Prescription 2 containing Medicine B and Medicine A (locks B, waits for A).
+  Both transactions wait on each other indefinitely until PostgreSQL aborts one with a deadlock exception. How did you mathematically eliminate database deadlocks in Healthray?"*
+- **The Senior Architectural Answer:**
+  1. **The Root Cause (Circular Wait Condition):**
+     - A deadlock can only occur if transactions acquire locks in non-deterministic (different) orders. If Counter 1 locks in order `[A, B]` and Counter 2 locks in order `[B, A]`, circular wait occurs.
+  2. **The Mathematical Solution (Deterministic Lock Acquisition Ordering):**
+     - Before acquiring any row locks in the database, the backend **sorts the medicine batch IDs in strictly ascending order** by Primary Key (`id`):
+       ```python
+       # FastAPI Service Layer
+       # Sort IDs to guarantee consistent global lock acquisition order across all transactions
+       sorted_batch_ids = sorted([item.batch_id for item in prescription.items])
+
+       async with db.transaction():
+           # Locks are acquired in strict numeric order: 101, 105, 142...
+           batches = await db.execute(
+               select(PharmacyBatch)
+               .where(PharmacyBatch.id.in_(sorted_batch_ids))
+               .order_by(PharmacyBatch.id.asc())
+               .with_for_update()
+           )
+       ```
+  3. **Why This Eliminates Deadlocks:**
+     - If both transactions require Batch 101 and Batch 205, **both will attempt to lock 101 first**.
+     - Counter 1 acquires 101. Counter 2 waits on 101 *before* acquiring anything else.
+     - Counter 1 proceeds to lock 205, commits, and releases both. Counter 2 then acquires 101 and 205.
+     - The circular wait graph is mathematically broken ($O \rightarrow O$ cycle is impossible). Deadlocks dropped to **absolute 0%** in production!
+
+---
+
+#### Hard Q2: Hospital Offline Dispensing & Network Partition Recovery
+- **The Grilling Question:**
+  *"Hospitals cannot stop dispensing life-saving medicines if the local Wi-Fi drops or the central database server is unreachable for 15 minutes. How did you design Healthray to handle intermittent network outages at the pharmacy counter, and how did you reconcile inventory when connectivity returned?"*
+- **The Senior Architectural Answer:**
+  1. **Edge PWA Offline Queue (`IndexedDB` + Service Worker):**
+     - The React POS interface is built as an offline-capable Progressive Web App (PWA).
+     - Medicine masters and current stock snapshots are cached locally in browser `IndexedDB`.
+     - When the network drops (`navigator.onLine === false`), the UI switches to **'Offline Emergency Dispensing Mode'**.
+  2. **Cryptographic Offline Sequence Stamping:**
+     - Offline bills are tagged with an emergency UUID and an offline cryptographic signature containing the physical counter hardware ID, timestamp, and an incrementing local sequence number (`OFFLINE-C1-0042`).
+     - A physical barcode paper slip is printed locally via USB thermal printer so the patient can receive their medication immediately.
+  3. **Idempotent Reconciliation Protocol (When Network Restores):**
+     - When connectivity returns, the background sync service replays the offline dispensing queue to `/api/v1/pharmacy/sync-offline` using an **Idempotency Key**.
+     - The backend processes items in chronological sequence. If physical stock in the assigned batch was exhausted during the outage by another counter, the system does not crash or reject the recorded bill; instead, it automatically files an **'Inventory Discrepancy Adjustment'** audit log and flags the supervisor dashboard for physical stock replenishment.
+
+---
+
+### Wishan (Cross-Platform Mobile App — Rihal, Muscat, Oman)
+
+#### Hard Q1: Payment Gateway Timeout & Double-Deduction Prevention
+- **The Grilling Question:**
+  *"A user taps 'Pay 25 OMR' in the Wishan React Native app. The Golang backend initiates a request to AmwalPay. However, due to telecom routing delays in Oman, AmwalPay takes 45 seconds to respond. The mobile app HTTP client times out after 30 seconds and shows 'Request Timed Out'. The impatient user taps 'Pay' again. How do you guarantee the customer's bank account is not debited twice?"*
+- **The Senior Architectural Answer:**
+  1. **Client-Side Request Idempotency Key:**
+     - The React Native app generates a unique UUIDv4 `idempotency_key` upon order checkout and binds it to that specific order intent in local memory.
+     - Tapping the 'Pay' button immediately disables the UI button (`isSubmitting = true`) and sends the header `Idempotency-Key: <UUID>` to the Golang REST API.
+  2. **Distributed Lock in Golang (Redis `SETNX`):**
+     - When the Golang API receives the payment request, it attempts to acquire a distributed lock in Redis:
+       `SET payment_lock:<order_id> "LOCKED" NX EX 60`.
+     - If the user somehow bypasses the UI or retries while the first request is still in-flight with AmwalPay, the second request immediately receives `HTTP 409 Conflict: Payment in progress`.
+  3. **Order State Machine Guard:**
+     - The database order record transitions from `CREATED` $\rightarrow$ `PAYMENT_PENDING` $\rightarrow$ `PAID`.
+     - If an existing payment session is already active for that `order_id`, Golang returns the existing `payment_url` rather than creating a duplicate transaction with AmwalPay.
+
+---
+
+#### Hard Q2: Mobile App Reverse Engineering & API Security
+- **The Grilling Question:**
+  *"What prevents a malicious user from running Proxyman or Charles Proxy on their mobile device, inspecting the Wishan payment requests, altering the price from 25 OMR to 0.01 OMR, and submitting the request to your backend?"*
+- **The Senior Architectural Answer:**
+  1. **Zero Client Trust on Financial Data:**
+     - The mobile app NEVER sends the price or amount to the backend payment initiation endpoint!
+     - The mobile client sends only the `order_id`. The Golang backend queries the authoritative database price for that `order_id` on the server, calculates taxes, and communicates the final amount directly to AmwalPay. The client has zero mathematical ability to tamper with pricing.
+  2. **SSL / TLS Certificate Pinning:**
+     - Implemented TLS Certificate Pinning in React Native using `react-native-ssl-pinning`.
+     - The app stores the SHA-256 hash of our backend's TLS certificate public key. If an attacker routes mobile traffic through a proxy like Charles or Burp Suite using a self-signed root CA, the TLS handshake fails immediately and the app terminates network communication.
+  3. **HMAC Webhook Verification:**
+     - Final payment confirmation is accepted strictly through AmwalPay's server-to-server webhook, validated using an HMAC-SHA256 signature hash with a secret key stored exclusively in backend environment variables.
+
+---
+
+### SBI Pension Funds Portal (Bigscal Domestic Project)
+
+#### Hard Q1: Concurrent Pension Nomination Share Over-Allocation Race Condition
+- **The Grilling Question:**
+  *"In a pension portal, an account owner has 3 legal nominees. The sum of their allocation percentages must equal exactly 100%. If two authorized operators or family members simultaneously edit nominee shares (Operator 1 assigns Nominee A 60% and Nominee B 40%; Operator 2 assigns Nominee A 70% and Nominee C 30%), concurrent un-isolated transactions could result in a total allocation of 140%. How did you prevent this at both the database and API level?"*
+- **The Senior Architectural Answer:**
+  1. **Optimistic Locking via Account Version Number:**
+     - The `pension_accounts` table contains a `version INT DEFAULT 1` column.
+     - When the frontend loads the nomination form, it receives the current `version: 4`.
+     - When updating:
+       ```sql
+       UPDATE pension_accounts 
+       SET version = version + 1, updated_at = NOW()
+       WHERE id = :account_id AND version = :client_version;
+       ```
+     - If Operator 2 commits first, `version` becomes 5. When Operator 1's request commits with `version = 4`, 0 rows are updated. FastAPI detects this and raises `HTTP 409 Conflict: The account details were updated by another session. Please reload and review the current shares.`
+  2. **Database Engine Constraint (Sum Check Guard):**
+     - Built a PostgreSQL trigger function that executes on nomination table modifications:
+       ```sql
+       CREATE OR REPLACE FUNCTION verify_nomination_percentage()
+       RETURNS TRIGGER AS $$
+       BEGIN
+           IF (SELECT SUM(share_percentage) FROM pension_nominees WHERE account_id = NEW.account_id) != 100.00 THEN
+               RAISE EXCEPTION 'Total nominee allocation percentage must equal exactly 100.00%%';
+           END IF;
+           RETURN NEW;
+       END;
+       $$ LANGUAGE plpgsql;
+       ```
+     - This guarantees that no application code bug or race condition can ever write an invalid percentage into financial records.
+
+---
+
 # PART 7 — QUICK-FIRE ROUND (RAPID INTERVIEW DRILLS)
 
 > **20 high-yield questions for last-minute review. Master these crisp, direct answers.**
@@ -5409,6 +6165,43 @@ async def get_presigned_upload_url(
 
 68. **What is Cross-Site WebSocket Hijacking (CSWSH)?**
     - An attack where a malicious third-party site opens an unauthorized WebSocket to your server, automatically inheriting the victim's session cookies; mitigated by strictly validating the `Origin` header during the HTTP 101 upgrade.
+
+
+69. **How do you configure Docker Compose for zero-downtime updates on a single VPS?**
+    - Build new images first (`docker compose build backend`), then restart with `--no-deps` (`docker compose up -d --no-deps backend`); Nginx buffers incoming requests during the 2-second container switch.
+
+70. **Why should database migrations use `prisma migrate deploy` instead of `prisma migrate dev` in production?**
+    - `deploy` strictly applies existing committed migration files without generating new migrations, resetting databases, or prompting for interactive confirmation.
+
+71. **What is the difference between Pessimistic Locking and Optimistic Locking?**
+    - Pessimistic Locking (`SELECT ... FOR UPDATE`) locks the database row immediately, preventing concurrent reads/writes until transaction commits; Optimistic Locking uses a `version` column and fails/retries if the version changed prior to commit.
+
+72. **Why should multi-tenant invoice numbers never be generated using `SELECT MAX(id)`?**
+    - Concurrent requests within the same millisecond read the same maximum number, creating duplicate invoice numbers that violate tax statutory compliance (e.g. Indian GST Section 31).
+
+73. **How does an in-app React Native WebView handle 3D-Secure payment redirects?**
+    - Intercept the URL in `onNavigationStateChange`; when the bank completes authentication and redirects to the deep link scheme (`wishan://callback`), parse transaction parameters and close the WebView.
+
+74. **What is FEFO, and how is it implemented in SQL?**
+    - First Expired, First Out; orders available stock batches by `expiry_date ASC` with `WHERE expiry_date > CURRENT_DATE FOR UPDATE` to dispense the nearest-expiring medicine first.
+
+75. **How does hardware USB barcode scanner input differ from standard keyboard input in React?**
+    - Barcode scanners emit rapid keystroke events (10–30ms per character) followed by an `Enter` key (key code 13); input listeners must accumulate characters without artificial software debounce to avoid truncation.
+
+76. **Why use `IndexedDB` instead of `localStorage` for financial form drafts?**
+    - `IndexedDB` is asynchronous (non-blocking for UI thread), supports structured object cloning (no manual `JSON.stringify`), has virtually unlimited storage (>50MB), and can store encrypted binary blobs.
+
+77. **What is the difference between Cosine Similarity and Dot Product in vector search?**
+    - Cosine similarity measures angle regardless of vector magnitude; Dot product equals cosine similarity if vectors are pre-normalized to unit length ($L_2=1$), but executes much faster.
+
+78. **How does Keycloak token caching work in FastAPI?**
+    - Fetch and cache Keycloak's public JWKS keys using `@alru_cache(maxsize=1, ttl=3600)` to verify RS256 JWT signatures locally without hitting Keycloak on every incoming API request.
+
+79. **What happens if Android OS kills a React Native app during external 2FA banking?**
+    - The in-memory state is wiped; resilient architectures persist the transaction ID to disk (`MMKV`/`AsyncStorage`) before backgrounding and verify payment status asynchronously via backend webhooks upon app restart.
+
+80. **Why should Celery tasks receive entity IDs instead of database model instances?**
+    - Database model instances hold open socket connections and internal session state that cannot be pickled across Redis/RabbitMQ message brokers. Pass `user_id: int` and let the worker query a fresh database session.
 
 ---
 *End of Guide. Practice Part 5, Scenario 4 and Part 6 out loud before your technical interview!*
