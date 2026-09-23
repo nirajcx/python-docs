@@ -1,104 +1,119 @@
-# System Design Quick Guide (Start Here)
+# System design — React + FastAPI + PostgreSQL (Hinglish)
 
-At 2.5 YOE for mid-size companies, system design rounds are usually **light**. They want to see that you can break a problem down, name the main pieces, and reason about tradeoffs out loud. You do NOT need to design Netflix.
+[Roadmap](../README.md) · Prerequisites: [Backend](02-fastapi-quick-guide.md), [DB](04-database-quick-guide.md)
 
-Format: **concept → plain explanation → what you say → follow-up.**
+## 1. Interview mein pehle kya bolna hai?
 
----
+“Pehle users, core flows, expected load, consistency aur failure expectations clarify karunga. Uske baad API/data model, simplest working architecture, bottlenecks aur trade-offs discuss karunga.”
 
-## 1. A framework you can use for any design question
+35-minute round: requirements 5 min → scale/data 5 → architecture 10 → one deep dive 10 → failure/trade-offs 5. Yeh practice allocation hai, company-specific pattern ka claim nahi.
 
-When asked "design X" (URL shortener, chat app, feed), walk through these steps out loud:
+## 2. Worked case: team task manager
 
-1. **Clarify requirements** — what does it need to do? How many users? Read-heavy or write-heavy?
-2. **Define the API** — a few endpoints (`POST /shorten`, `GET /{code}`).
-3. **Design the data** — what tables/collections? Key fields?
-4. **Draw the flow** — client → API → database/cache.
-5. **Scale it** — add caching, replicas, a queue where needed.
-6. **Mention tradeoffs** — you don't need the perfect answer, just show you see the options.
+**Scope:** users projects join karein, tasks create/list/update karein, comments add karein; notification eventually deliver ho. Out of scope initially: full-text search, offline sync, attachments.
 
-**Interview tip:** Talking through this structure calmly matters more than the final diagram.
+**Assumptions for practice:** 10k daily users, each 100 requests/day = 1M/day ≈ 11.6 average requests/sec. Assume 10× peak ≈ 116/sec. Yeh invented sizing assumptions hain; measured capacity nahi. Starting point modular monolith + Postgres; Kafka/sharding automatically required nahi.
 
----
+**Goals:** tenant isolation, no silent lost updates, p95 API latency target 300 ms for ordinary CRUD (proposed target, benchmark nahi), notification delay acceptable up to a minute.
 
-## 2. The building blocks you should be able to name
+```mermaid
+flowchart TD
+    U[React UI: forms and query cache] -->|HTTPS| L[Load balancer]
+    L --> A[FastAPI instances]
+    A --> D[(PostgreSQL: tasks and outbox)]
+    W[Outbox dispatcher] -->|read pending events| D
+    W --> Q[Durable job queue]
+    Q --> N[Notification worker]
+    N --> E[Email provider]
+    A -. optional measured read cache .-> R[(Redis)]
+```
 
-- **Load balancer** — spreads traffic across multiple servers.
-- **App servers** — your FastAPI/Node instances (stateless, so you can run many).
-- **Database** — source of truth (usually PostgreSQL).
-- **Cache (Redis)** — stores hot data in memory so you don't hit the DB every time.
-- **Queue (Celery/RabbitMQ/Kafka)** — for background/async work.
-- **CDN** — serves static assets close to users.
-- **Object storage (S3)** — for files and images.
+Flow: React authenticated API call karega, FastAPI permission validate karega, transaction task + event persist karegi. Worker notification asynchronously bhejega. Redis sirf measured need par add karna.
 
-**Interview answer:** "I keep app servers stateless so I can scale them horizontally behind a load balancer. Session/hot data goes in Redis, files go in object storage, and heavy background work goes to a queue."
+## 3. Data model + API contracts
 
----
+| Table | Key fields / constraints |
+|---|---|
+| users | id, unique login identifier |
+| projects | id, tenant_id, name |
+| project_members | project_id + user_id unique, role |
+| tasks | id, project_id FK, title, status, version, created_at |
+| comments | id, task_id FK, author_id FK, body |
+| outbox | id, event_type, payload, created_at, published_at |
 
-## 3. Caching (the most common scaling tool)
+Index: `tasks(project_id, created_at DESC, id DESC)` for project feed. Status filter common ho toh alternative `(project_id, status, created_at DESC, id DESC)` compare with actual plans. Membership lookup ke liye composite key.
 
-**Plain explanation:** Reading from memory (Redis) is much faster than reading from disk (database). Cache data that's read often and changes rarely.
+| Endpoint | Important contract |
+|---|---|
+| POST /projects/{id}/tasks | membership check, validation, 201 |
+| GET /projects/{id}/tasks?cursor=... | membership, stable ordering, page-size cap |
+| PATCH /tasks/{id} | permitted fields + expected version; 409 on conflict |
+| POST /tasks/{id}/comments | membership, size limit, 201 |
 
-**Cache-aside pattern (most common):**
-1. Check the cache.
-2. Miss? Read from DB, then store in cache.
-3. Return the data.
+Frontend version send karega; server `WHERE id=:id AND version=:expected` update karega. Zero affected rows par missing/unauthorized/conflict appropriately resolve karo. React 409 par latest version fetch karke user ko reconcile option de; silently overwrite mat karo.
 
-**Key challenge — invalidation:** when the underlying data changes, you must update or delete the cached copy, or set a TTL (expiry) so it refreshes.
+## 4. Write + event ka failure-safe flow
 
-**Interview answer:** "I use cache-aside with Redis: check cache, fall back to DB on a miss, and store the result. I set a TTL and invalidate on writes so I don't serve stale data."
+```mermaid
+sequenceDiagram
+    participant UI as React
+    participant API as FastAPI
+    participant DB as PostgreSQL
+    participant Worker as Dispatcher
+    participant Queue as Job queue
+    UI->>API: Create task
+    API->>DB: Begin transaction and insert task plus outbox
+    DB-->>API: COMMIT succeeds
+    API-->>UI: 201 task
+    Worker->>DB: Claim pending outbox rows
+    Worker->>Queue: Publish event ID
+    Queue-->>Worker: Ack
+    Worker->>DB: Mark published
+```
 
----
+DB commit ke baad directly queue publish karne mein crash gap hai. Outbox event same DB transaction mein persist karta hai. Publish ke baad mark se pehle crash hua toh duplicate event possible. Consumer event ID deduplicate kare; external email provider supports idempotency toh use karo. Otherwise external delivery exactly-once guarantee mat bolo. Multiple dispatchers row claims/leases use karein, abandoned claims recover hon.
 
-## 4. Scaling: vertical vs horizontal
+## 5. Failures jo interviewer push kar sakta hai
 
-- **Vertical:** bigger machine (more CPU/RAM). Simple but has a ceiling.
-- **Horizontal:** more machines. Needs stateless servers and a load balancer, but scales much further.
+| Failure | Handling + cost |
+|---|---|
+| API commit hua, response lost | operation-scoped idempotency key and saved response; payload mismatch reject |
+| Two edits together | optimistic version check; user resolves conflict |
+| Worker down | pending durable backlog; oldest-job-age alert |
+| Retry storm | retry cap, backoff+jitter, dead-letter/manual recovery |
+| Redis unavailable | bounded DB fallback; DB overload protection |
+| Replica lag | critical read-after-write primary se; eventual reads selectively |
+| Wrong tenant task ID | server-side membership/resource scope, negative tests |
+| DB connection exhaustion | bounded pool, timeouts, admission control, capacity planning |
 
-**Interview answer:** "I scale vertically first because it's simple, then horizontally by adding stateless instances behind a load balancer once I hit limits."
+## 6. Caching aur consistency
 
----
+Cache-aside: read cache → miss → DB → cache with TTL. Write DB commit ke baad invalidate, lekin racing readers stale data re-cache kar sakte hain. Staleness tolerance define karo; versions/short TTL/stronger coordination where needed. Authorization-sensitive data ko public cache key mein mat rakho.
 
-## 5. Database scaling basics
+Replica reads eventually consistent ho sakti hain. “Save ke turant baad old title” bug ko UI cache aur replication lag dono angle se debug karo. Serializable DB transaction external services ko automatically atomic nahi banati.
 
-- **Read replicas** — copies that serve read queries, taking load off the primary. Writes go to the primary.
-- **Indexing** — often the cheapest fix for a slow app.
-- **Sharding** — splitting data across databases by some key. Powerful but complex; mention it, only go deep if pushed.
+CAP mein network partition ke time availability vs consistency tension explain karo; “always choose any two” oversimplified hai. Monolith vs microservices ownership/deployment boundaries par choose karo, buzzwords par nahi.
 
----
+## 7. Browser experience bhi design ka part hai
 
-## 6. Sync vs async work (queues)
+- Form validation + server field errors; submit pending state.
+- Query cache invalidate/update; auth/tenant-aware cache keys.
+- Cursor pagination, loading skeleton, empty/error/retry states.
+- Accessible labels, keyboard support, focus after dialogs/errors.
+- Notification updates initially polling; low-latency server push needed ho toh SSE, bidirectional chat ho toh WebSocket evaluate karo.
 
-**Plain explanation:** If a task is slow (sending email, generating a report, processing a document), don't make the user wait. Return quickly and do the work in the background via a queue.
+## 8. Observability, deployment, scaling
 
-**Interview answer:** "For slow or unreliable operations I return immediately and push the job to a queue so a worker handles it. That keeps the API responsive and lets the work retry if it fails."
+Request ID logs + traces: API latency, DB queries/pool wait, external calls. Metrics: p95/p99, error rate, saturation, queue age, business success. Tokens/passwords logs mein nahi.
 
----
+Deploy: compatible schema first, readiness probe, graceful drain, bounded timeouts, rollback path. Scale measured bottleneck: query/index → pool/CPU → replicas/instances → partitioning only when justified. Stateless API replicas ke local memory mein shared sessions/jobs mat rakho.
 
-## 7. Statelessness & sessions
+## 9. Two mini-design drills
 
-**Plain explanation:** If each server remembers who's logged in, you can't freely add servers. Keep servers stateless — store sessions in Redis or use JWTs — so any server can handle any request.
+**URL shortener (15 min):** POST creates random code with UNIQUE constraint and collision retry; GET resolves and redirects. Discuss expiration, malicious-link abuse, hot-code cache, cache invalidation, 301 vs 302 caching behavior. Analytics queue mein; redirect critical path simple.
 
----
+**Document upload (20 min):** authorize → scoped short-lived upload URL → object store → finalize verification → durable processing job → status polling/SSE. Validate size/type server-side, store job ownership, retry idempotently, download authorization enforce karo. LLM/RAG extension sirf relevant JD ho toh.
 
-## 8. A worked mini-example: "Design a URL shortener"
+**Readiness:** whiteboard par one write, one read, duplicate retry, unauthorized user aur DB failure walk through kar pao.
 
-- **Requirements:** shorten a long URL, redirect on visit, handle lots of reads.
-- **API:** `POST /shorten` → returns short code; `GET /{code}` → redirect.
-- **Data:** table `(id, short_code, long_url, created_at)`, index on `short_code`.
-- **Flow:** generate a unique short code, store the mapping, redirect on lookup.
-- **Scale:** it's read-heavy, so cache `short_code → long_url` in Redis; add read replicas.
-- **Tradeoff:** random code vs encoding the id — mention both.
-
-Practice narrating this in ~5 minutes.
-
----
-
-## Quick self-test
-1. Walk through your steps for any "design X" question.
-2. Explain cache-aside and why invalidation is hard.
-3. Vertical vs horizontal scaling — pros and cons?
-4. Why keep app servers stateless?
-5. When do you push work to a queue?
-
-More detail: [`../04-system-design-dsa/11-system-design-basics.md`](../04-system-design-dsa/11-system-design-basics.md).
+Depth: [system design reference](../04-system-design-dsa/11-system-design-basics.md), [scale scenarios](../questions-bank/06-scale-fintech-scenarios-questions.md).

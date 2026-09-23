@@ -1,94 +1,125 @@
-# React & Next.js Quick Guide (Start Here)
+# React concepts — Hinglish interview guide
 
-This is your strong area, so this guide is about **saying things clearly** in an interview, not learning from scratch. These are the answers that come up most for a 2.5 YOE frontend dev.
+[Roadmap](../README.md) · Prerequisite: [JavaScript](10-javascript-fundamentals-guide.md) · [TypeScript](11-typescript-guide.md)
 
-Format: **question → the crisp answer → likely follow-up.**
+## 1. Render, commit, paint
 
----
+```mermaid
+flowchart LR
+    A[State / props / context update] --> B[Render: calculate UI]
+    B --> C[Commit: apply DOM changes]
+    C --> D[Browser paint]
+    C --> E[Effect synchronization]
+```
 
-## 1. How does React update the UI?
+Effect timing ko paint ke strictly baad assume mat karo; interaction ke cases mein timing differ kar sakti hai. Render pure hona chahiye, kyunki work repeat/discard ho sakta hai. Re-render ka matlab DOM change compulsory nahi. Virtual DOM automatically har implementation se faster hone ki guarantee nahi.
 
-**Answer:** "React keeps a virtual representation of the UI. When state changes, it builds a new tree, compares it to the old one (diffing), and updates only the DOM nodes that actually changed. This batching and minimal-update approach is why it's fast."
+**Interview answer:** “React render mein next UI calculate karta hai, commit mein required DOM changes apply karta hai. Main render ke andar network requests ya mutations nahi karta.”
 
-**Follow-up:** *"What is the key prop for?"* → It helps React match items between renders so it reuses DOM nodes instead of recreating them. Use a stable unique id, never the array index for dynamic lists.
+## 2. State snapshot aur batching
 
----
+```jsx
+// Assume count is 0 for this render:
+setCount(count + 1);
+setCount(count + 1);   // next count = 1
 
-## 2. `useState` vs `useEffect` vs `useMemo` vs `useCallback`
+// Alternative, starting from 0:
+setCount(c => c + 1);
+setCount(c => c + 1); // next count = 2
+```
 
-- **`useState`** — component state; changing it triggers a re-render.
-- **`useEffect`** — run side effects after render (data fetch, subscriptions). Cleanup runs on unmount or before the next run.
-- **`useMemo`** — cache an expensive computed value between renders.
-- **`useCallback`** — cache a function so it isn't recreated every render (useful when passing callbacks to memoized children).
+Handler apne render ka snapshot dekhta hai. Updater functions pending updates ko compose karti hain. Setter call current closure variable change nahi karta. [React state snapshot](https://react.dev/learn/state-as-a-snapshot).
 
-**Follow-up:** *"When do you actually need useMemo/useCallback?"* → Only when there's a real cost: an expensive calculation, or a dependency that must stay referentially stable. Don't wrap everything — it adds complexity for no gain.
+Nested update mein changed path copy karo: `setUser(u => ({...u, address: {...u.address, city: 'Delhi'}}))`. State duplicate mat rakho agar current props/state se calculate ho sakta hai.
 
----
+## 3. Effects: external systems se synchronization
 
-## 3. The rules of hooks
+`useEffect` subscriptions, browser APIs ya external synchronization ke liye hai. Filtered list/total render mein derive karo; button-specific work event handler mein rakho. Dependencies effect ke reactive reads se follow hoti hain, preference se nahi. [You might not need an Effect](https://react.dev/learn/you-might-not-need-an-effect).
 
-**Answer:** "Only call hooks at the top level of a component or another hook, never inside conditions or loops. React tracks hooks by call order, so the order must be identical on every render."
+```jsx
+import { useEffect, useState } from 'react';
 
----
+export function useSearch(query) {
+  const [state, setState] = useState({
+    items: [], loading: false, error: null
+  });
+  useEffect(() => {
+    const q = query.trim();
+    if (!q) {
+      setState({ items: [], loading: false, error: null });
+      return;
+    }
+    const controller = new AbortController();
+    let ignore = false;
+    setState({ items: [], loading: true, error: null });
+    const timer = setTimeout(async () => {
+      try {
+        const response = await fetch(`/api/search?q=${encodeURIComponent(q)}`, {
+          signal: controller.signal
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const items = await response.json(); // demo assumes API returns an array
+        if (!ignore) setState({ items, loading: false, error: null });
+      } catch (error) {
+        if (!ignore) setState({ items: [], loading: false, error: String(error) });
+      }
+    }, 300);
+    return () => {
+      ignore = true;
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [query]);
+  return state;
+}
+```
 
-## 4. Why is state immutable in React?
+Yeh hook debounce + cancellation + obsolete response guard sikhata hai. Real app mein response validation aur reusable server-state cache evaluate karo. Abort request server-side operation rollback nahi karta.
 
-**Answer:** "React decides whether to re-render by comparing references. If I mutate state directly, the reference doesn't change, so React may skip the update. I always create a new object/array — e.g. `setItems([...items, newItem])`."
+Cleanup next changed-dependency setup se pehle aur unmount par run hoti hai. Development Strict Mode extra setup/cleanup cycle se bugs expose kar sakta hai; disable karna fix nahi. [React useEffect](https://react.dev/reference/react/useEffect).
 
----
+## 4. Keys, refs, controlled input
 
-## 5. Controlled vs uncontrolled components
+Keys sibling identity define karti hain. Sorted editable list mein index key se input state wrong item ke saath attach ho sakti hai. Stable ID use karo; changing key intentionally subtree state reset kar sakti hai.
 
-- **Controlled:** the input value lives in React state (`value` + `onChange`). Predictable, easy to validate.
-- **Uncontrolled:** the DOM holds the value; you read it with a ref. Less code, less control.
+Ref renders ke across mutable value preserve karta hai, ref write re-render request nahi karta. Timer/DOM reference ke liye good; displayed counter ke liye state.
 
----
+Controlled input: `value` + `onChange`, React source of truth. Uncontrolled: `defaultValue`/DOM state, ref ya form APIs se read. Input ko uncontrolled se controlled switch mat karo accidentally (`undefined` → string).
 
-## 6. Next.js: SSR vs SSG vs CSR vs RSC
+## 5. State kahan rakhein?
 
-**Plain explanation:**
-- **CSR** — render in the browser (classic React SPA).
-- **SSR** — render HTML on the server per request (fresh data, good SEO).
-- **SSG** — render at build time (fastest, for content that rarely changes).
-- **RSC (React Server Components)** — components that run only on the server and send rendered output to the client, shipping less JS.
+| Data | Default location |
+|---|---|
+| input/modal toggle | closest component state |
+| shareable filters/page | URL search params |
+| theme/current auth context | context if appropriate |
+| complex shared client workflow | reducer/store |
+| remote records | query cache / framework data layer |
 
-**Answer:** "I pick based on data freshness and SEO. Static marketing pages → SSG. Dashboards with per-request data → SSR or client fetching. In the App Router, Server Components let me keep data-fetching and heavy logic on the server and only ship interactive bits as Client Components."
+Context changed value consume karne wale components ko re-render kar sakta hai; split providers/state ownership useful hai. Redux/Zustand mandatory nahi. Server cache key mein filters aur user/tenant scope include karo, logout par sensitive cache clear karo.
 
-**Follow-up:** *"What causes a hydration error?"* → The server-rendered HTML doesn't match what the client renders on first pass — often from using `Date.now()`, `window`, or random values during render. Fix by keeping render deterministic or gating browser-only code to `useEffect`.
+Optimistic update: snapshot → optimistic change → server mutation → rollback/refetch on failure. Multiple simultaneous mutations mein old rollback newer success overwrite na kare; versioning/invalidation strategy explain karo.
 
----
+## 6. Performance aur UX
 
-## 7. `use client` vs Server Components
+Measure React Profiler + browser performance/network se. Localize state, avoid expensive synchronous render, paginate/virtualize big lists, code split heavy routes. `memo`, `useMemo`, `useCallback` measured need ke liye; correctness inke cache par depend nahi honi chahiye.
 
-**Answer:** "By default App Router components are Server Components (no JS shipped, can fetch data directly). I add `'use client'` only when I need state, effects, or browser APIs. Keeping the client boundary small means less JavaScript and faster loads."
+`useCallback` stable function reference return kar sakta hai; function expression creation magically stop nahi hoti. `useTransition` non-urgent state update mark karta hai; network debounce nahi. Suspense arbitrary Effect fetch ko automatically track nahi karta; compatible framework/resource needed.
 
----
+Forms mein loading, empty, error, retry, disabled submit, accessible labels aur keyboard handling include karo. Error boundaries descendant render failures ke liye; event handler/ordinary async errors explicitly handle karo.
 
-## 8. State management: when to reach for what
+## 7. Next.js ko React se separate explain karo (P1)
 
-- **Local state** (`useState`) — most of the time.
-- **Context** — low-frequency global data (theme, current user). Not for fast-changing state (causes re-renders).
-- **Zustand / Redux** — larger shared client state.
-- **TanStack Query** — server state (caching, refetching, loading/error). Don't hand-roll this in `useEffect`.
+CSR: browser rendering; SSR: server HTML; SSG: build/prerender; RSC: server component execution model. RSC aur SSR same concept nahi. Client Component initial HTML server par prerender ho sakta hai, browser interaction hydrate hoti hai. `'use client'` module boundary define karta hai; browser globals ko render mein blindly read mat karo.
 
-**Answer:** "I separate server state from client state. Server data goes in TanStack Query so I get caching and refetching for free. Client-only UI state stays in local state or a small store like Zustand."
+Hydration mismatch = initial client/server output inconsistent. Time/random/locale/browser-only values inspect karo. Framework caching/rendering defaults version-specific hain; project version verify karke answer do.
 
----
+## Follow-up ladder
 
-## 9. Performance basics
+1. Search results old query ke kyun aa rahe? → race → cleanup/guard → request cancellation.
+2. Counter stale kyun? → closure snapshot → functional updater → dependencies.
+3. List delete ke baad wrong input? → key identity → stable IDs.
+4. Typing slow? → profile → state scope → expensive render → virtualization/memo where useful.
+5. Optimistic save fail? → rollback → concurrency/version conflict → accessible error feedback.
 
-- Split code with dynamic imports so the initial bundle is small.
-- Memoize expensive children with `React.memo` when props are stable.
-- Virtualize long lists.
-- Debounce expensive handlers (search-as-you-type).
-
----
-
-## Quick self-test
-1. Why must React state be updated immutably?
-2. When do you actually need `useMemo`/`useCallback`?
-3. SSG vs SSR — how do you choose?
-4. What causes a hydration mismatch and how do you fix it?
-5. When would you use TanStack Query over `useEffect` + `useState`?
-
-More detail: [`../06-frontend-react/14-react-core-architecture.md`](../06-frontend-react/14-react-core-architecture.md), [`15-nextjs-and-react-native.md`](../06-frontend-react/15-nextjs-and-react-native.md), [`18-react-ecosystem-libraries.md`](../06-frontend-react/18-react-ecosystem-libraries.md).
+Depth: [reviewed React/browser chapter](../09-deep-dive/06-react-browser-engineering.md). Supplementary historical references: [React architecture](../06-frontend-react/14-react-core-architecture.md), [state management](09-state-management-guide.md), [ecosystem](../06-frontend-react/18-react-ecosystem-libraries.md).

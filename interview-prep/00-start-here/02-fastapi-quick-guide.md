@@ -1,160 +1,128 @@
-# FastAPI Quick Guide (Start Here)
+# Backend + FastAPI concepts — request se database tak
 
-Written for someone coming from Express.js. FastAPI is the Python equivalent of Express + Zod + auto-Swagger, with async built in.
+[Roadmap](../README.md) · Prerequisite: [Python](01-python-quick-guide.md) · Next: [Database](04-database-quick-guide.md)
 
-Format: **concept → plain explanation → what you say in an interview → likely follow-up.**
+## 1. Request lifecycle explain karo
 
----
+```mermaid
+flowchart LR
+    A[React client] --> B[Proxy / ASGI server]
+    B --> C[Middleware]
+    C --> D[Route matching and dependencies]
+    D --> E[Validation and authorization]
+    E --> F[Service / transaction]
+    F --> G[(PostgreSQL)]
+    F --> H[Response serialization]
+    H --> A
+```
 
-## 1. The mental model: Express vs FastAPI
+Yeh conceptual flow hai: dependency resolution aur input validation interleaved ho sakte hain. Uvicorn ASGI server hai, FastAPI web framework, Starlette web primitives deta hai aur Pydantic data validation karta hai.
 
-| Express.js | FastAPI |
-|---|---|
-| Manual validation (Joi/Zod) | Automatic validation via Pydantic |
-| Manual Swagger setup | Auto docs at `/docs` |
-| `req.user` via middleware | Dependency Injection via `Depends()` |
-| Runs itself | Needs a server (Uvicorn) to run |
+**Interview answer:** “Route transport details handle karta hai, service business rules, DB constraints final integrity. Main request validation aur authorization ko alag checks maanta hoon.”
 
-**Interview answer:** "FastAPI is built on Starlette (async web framework) and Pydantic (validation). You define request/response shapes with Python type hints, and it gives you validation, serialization, and interactive docs for free."
+## 2. Minimal executable API: validation, path, query, response
 
----
-
-## 2. A basic endpoint
+Save as `main.py`; install FastAPI/Uvicorn in a virtual environment, then `uvicorn main:app --reload` for development.
 
 ```python
-from fastapi import FastAPI
-from pydantic import BaseModel
+from typing import Annotated
+from fastapi import FastAPI, Query
+from pydantic import BaseModel, Field
 
 app = FastAPI()
 
-class CreateUser(BaseModel):
-    name: str
-    age: int
+class QuoteIn(BaseModel):
+    quantity: int = Field(gt=0, le=100)
+    unit_price_paise: int = Field(ge=0)
 
-@app.post("/users")
-async def create_user(user: CreateUser):
-    return {"message": f"Created {user.name}"}
-```
+class QuoteOut(BaseModel):
+    total_paise: int
 
-Pydantic validates the body automatically. Send bad data and you get a clean 422 error — no manual checks.
+@app.post("/quotes", response_model=QuoteOut)
+def quote(body: QuoteIn):
+    return QuoteOut(total_paise=body.quantity * body.unit_price_paise)
 
-**Follow-up:** *"Why 422 not 400?"* → 400 means the JSON itself is broken/unparseable. 422 means the JSON parsed fine but failed your schema rules (e.g. `age` was a string).
-
----
-
-## 3. Path, query, and body params
-
-FastAPI figures out where each value comes from by its type hint and position:
-
-```python
 @app.get("/items/{item_id}")
-async def get_item(item_id: int, q: str | None = None):
-    # item_id comes from the URL path
-    # q comes from the query string (?q=...)
-    return {"item_id": item_id, "q": q}
+def item(item_id: int, limit: Annotated[int, Query(ge=1, le=100)] = 20):
+    return {"id": item_id, "limit": limit}
 ```
 
----
+Yeh calculation demo hai, trusted checkout nahi: real purchase mein price server-side catalog se aayegi. Integer paise ya decimal money ke liye useful hai; binary float rounding surprises de sakta hai.
 
-## 4. Pydantic (the star of the show)
+Pydantic v2 mein `model_dump()`, `model_validate()` use karo. Default validation kuch coercion allow karti hai, jaise numeric string → integer; strictness explicitly choose karo. Output schema accidental fields filter karne mein help karti hai, authorization replace nahi karti. [Pydantic models](https://docs.pydantic.dev/latest/concepts/models/).
 
-**Plain explanation:** Pydantic models are like Zod schemas or TypeScript types that actually run at runtime. They validate and convert data.
+## 3. `async def` vs `def`
+
+| Situation | Choice | Reason |
+|---|---|---|
+| async DB / HTTP client | `async def` + `await` | waiting ke dauran loop available |
+| blocking sync SDK | sync route, ya bounded thread offload | loop block avoid |
+| CPU-heavy report/image processing | process/worker | async CPU parallelism nahi deta |
+
+FastAPI-called sync routes/dependencies thread pool mein run hote hain. Async route ke andar manually called normal helper automatically offload **nahi** hota. Blocking work us worker ka event loop stall karta hai; “poora multi-worker server freeze” universal statement nahi hai. [FastAPI concurrency](https://fastapi.tiangolo.com/async/).
+
+**Follow-up:** More workers = more pools/memory. Example: 4 workers × (pool 10 + overflow 5) = up to 60 DB connections, before other services. Worker count load test se choose karo.
+
+## 4. Dependency injection vs middleware
+
+`Depends` per-route reusable requirements ke liye: current identity, permissions, session. Middleware broad request concerns ke liye: tracing, timings, headers. DI test mein replacement easy banata hai.
+
+Illustrative SQLAlchemy wiring; `SessionFactory` configured `async_sessionmaker` hai:
 
 ```python
-from pydantic import BaseModel, Field
+async def get_session():
+    async with SessionFactory() as session:
+        yield session
 
-class Product(BaseModel):
-    name: str = Field(min_length=1)
-    price: float = Field(gt=0)          # must be > 0
-    tags: list[str] = []
+# Service owns transaction, not the cleanup block:
+async def create_record(session, record):
+    async with session.begin():
+        session.add(record)
+        await session.flush()
+    return record
 ```
 
-**Interview answer:** "Pydantic validates and parses input based on type hints. It's like Zod, but it's the core of how FastAPI validates every request and serializes every response."
+Commit response success se pehle karo taaki DB failure successful response ke baad surprise na ho. `yield` cleanup timing scope/version se related hai; resource background job mein pass mat karo, job apna session banaye. [FastAPI yield dependencies](https://fastapi.tiangolo.com/tutorial/dependencies/dependencies-with-yield/).
 
-**Note (v1 vs v2):** In Pydantic v2 use `model_dump()` (not `.dict()`) and `@field_validator` (not `@validator`). Knowing this shows you're current.
+Ek `AsyncSession` multiple concurrent tasks mein share mat karo; session transaction state rakhti hai. Each concurrent task ko own session do, aur atomic operation ko ek transaction mein rakho. [SQLAlchemy asyncio](https://docs.sqlalchemy.org/en/20/orm/extensions/asyncio.html).
 
----
+## 5. HTTP contract
 
-## 5. Dependency Injection with `Depends()`
+| Code | Typical use |
+|---|---|
+| 200 / 201 / 202 / 204 | success / created / accepted but pending / no body |
+| 400 | application-defined bad request |
+| 401 / 403 | missing-invalid authentication / insufficient permission |
+| 404 / 409 | missing resource / conflict such as duplicate version |
+| 422 | FastAPI request validation default |
+| 429 / 503 | rate limited / temporarily unavailable |
 
-**Plain explanation:** `Depends()` is how you share reusable logic — DB sessions, the current user, auth checks — across routes. It's cleaner than Express middleware because it shows up in the docs and is easy to mock in tests.
+FastAPI malformed JSON bhi default request-validation flow mein 422 de sakta hai. “Bad JSON always 400” galat shortcut hai. Response validation bug server-side error hai; client input error ki tarah expose mat karo. [FastAPI error handling](https://fastapi.tiangolo.com/tutorial/handling-errors/).
 
-```python
-from fastapi import Depends, HTTPException
+PUT generally representation replace karta hai; PATCH partial update. Idempotent ka meaning repeated operation ka intended effect same—response code same hona zaroori nahi. POST ke retries ke liye operation-scoped idempotency key design kar sakte ho.
 
-async def get_db():
-    db = SessionLocal()
-    try:
-        yield db          # give it to the route
-    finally:
-        db.close()        # always cleaned up, even on error
+## 6. Auth interview answer
 
-async def get_current_user(token: str):
-    if not token:
-        raise HTTPException(401, "Not authenticated")
-    return {"id": 1}
+“Authentication se pata chalta hai user kaun hai; authorization se kis resource par kya kar sakta hai. Token valid hone ke baad bhi task ka owner/tenant check karunga.”
 
-@app.get("/me")
-async def me(user=Depends(get_current_user), db=Depends(get_db)):
-    return user
-```
+JWT encoded/signed ho sakta hai, encrypted by default nahi. Signature, allowed algorithm, expiry aur applicable issuer/audience verify karo. Password hash karo, reversible encrypt nahi. Browser session cookie mein HttpOnly/Secure/SameSite choose karo; cookie auth ke saath CSRF protections, bearer storage ke saath XSS threat consider karo. CORS browser cross-origin reading policy hai, API authorization nahi.
 
-**Interview answer:** "Dependencies are reusable functions injected into routes. A dependency with `yield` sets up a resource, hands it over, and guarantees cleanup afterward — I use that pattern for DB sessions so they always close."
+`GET /tasks/{id}` mein sirf ID lookup enough nahi: query ko authenticated user ke allowed tenant/project se scope karo. Tenant ID ko request body se blindly trust mat karo.
 
----
+## 7. Background work, retries, idempotency
 
-## 6. `async def` vs `def` (top interview question)
+`BackgroundTasks` same app process mein response ke baad work run karta hai. Durable business workflow ke liye persisted jobs + worker + retries useful hain. Async background task mein blocking code event loop phir bhi block karega. [FastAPI background tasks](https://fastapi.tiangolo.com/tutorial/background-tasks/).
 
-**Plain explanation:**
-- `async def` runs on the main event loop. Only put non-blocking `await` calls here (async DB, `httpx`). If you put blocking code here, you freeze the whole server.
-- `def` (plain) is auto-run in a background thread pool, so blocking code is safe but has thread overhead.
+Timeout ka matlab remote side-effect definitely nahi hua, aisa nahi. Payment/report job retry par duplicate effect avoid karna padta hai. Retry transient errors only, capped exponential backoff + jitter; permanent validation failure retry mat karo. DB write aur job publication gap ke liye transactional outbox dekho [system design](05-system-design-quick-guide.md).
 
-**Rule of thumb:** Using an async library? Use `async def`. Stuck with a blocking/sync library? Use plain `def`, or offload with `await asyncio.to_thread(...)`.
+## 8. Testing aur production debugging
 
-**Interview answer:** "If I'm calling async libraries I use `async def` so it runs on the event loop. If I only have a blocking library, I use a normal `def` so FastAPI runs it in a worker thread and doesn't block the loop. The mistake to avoid is blocking code inside `async def`."
+- Service unit tests: business rules, clock/payment client dependencies.
+- API tests: invalid input, missing auth, wrong tenant, duplicate action, not-found.
+- Real DB integration tests: unique constraint, rollback, concurrent update; ORM mock se yeh prove nahi hota.
+- End-to-end: login → create → refresh → data persists.
+- Slow API: request trace → DB time/pool wait → external API time → CPU/event-loop lag. Average ke saath p95/p99 dekho.
 
----
+**Practice gate:** 60 minutes mein authenticated CRUD design karo; list filtering/pagination, transaction boundary aur test cases explain karo. Full task [coding round](12-scenario-coding-round.md) mein hai.
 
-## 7. Background tasks vs a real queue
-
-**Plain explanation:** `BackgroundTasks` runs *after* the response, but inside the same process — if the server restarts, the work is lost. Fine for fire-and-forget logging. For important work (emails, embeddings, retries), use a real queue like Celery/ARQ with Redis.
-
-**Interview answer:** "BackgroundTasks is fine for small non-critical work. For anything important or retryable, I'd use a proper task queue so work survives restarts and can be retried."
-
----
-
-## 8. Startup/shutdown (lifespan)
-
-```python
-from contextlib import asynccontextmanager
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # startup: open DB pool, load models
-    yield
-    # shutdown: close connections
-
-app = FastAPI(lifespan=lifespan)
-```
-
-Use this to open a DB pool on startup and close it on shutdown.
-
----
-
-## 9. Running it
-
-FastAPI doesn't run itself — you need an ASGI server:
-
-```bash
-uvicorn main:app --reload
-```
-
----
-
-## Quick self-test
-1. Difference between `async def` and `def` in a route, and when to use each?
-2. Why does FastAPI return 422 instead of 400 on bad input?
-3. What does a `yield` dependency give you over plain setup code?
-4. When would you NOT use BackgroundTasks?
-
-More detail: [`../02-fastapi-backend/04-fastapi-core.md`](../02-fastapi-backend/04-fastapi-core.md) and [`05-fastapi-advanced.md`](../02-fastapi-backend/05-fastapi-advanced.md).
+Depth: [reviewed production/ORM chapter](../09-deep-dive/05-backend-production-patterns.md), [JWT/session chapter](../09-deep-dive/02-auth-jwt-sessions.md). Supplementary historical references: [FastAPI core](../02-fastapi-backend/04-fastapi-core.md), [advanced](../02-fastapi-backend/05-fastapi-advanced.md), [ORM](../02-fastapi-backend/06-databases-orm.md).

@@ -46,17 +46,17 @@ Choosing the wrong primary key format can cripple database performance at scale.
 ┌────────────────────────────────────────┐    ┌────────────────────────────────────────┐
 │ [1] ──► [2] ──► [3] ──► [4] ──► [5]    │    │ [c8] ──► [04] ──► [fa] ──► [1a] ──► [e2]│
 │ Appends sequentially to rightmost leaf │    │ Inserts randomly anywhere in B-tree    │
-│ Cache-friendly, 0 page splits!         │    │ Constant B-Tree page splits & high I/O!│
+│ Good locality; splits still occur         │    │ Constant B-Tree page splits & high I/O!│
 └────────────────────────────────────────┘    └────────────────────────────────────────┘
 ```
 
 | Key Strategy | Size | Distributed Unique? | B-Tree Locality | Security / Leakage Risk |
 |---|---|---|---|---|
 | **`BIGINT` (Auto-Increment)** | 8 Bytes | ❌ Requires central coordinator | **Optimal** (Sequential append) | **High**: Enumeration attack (`/api/users/1042`) reveals business volume. |
-| **`UUID v4` (Random)** | 16 Bytes | ✅ Globally collision-free | **Catastrophic** (Random fragmentation)| **Zero**: Completely opaque and unguessable. |
-| **`UUID v7` / `ULID` (Time-Sorted)**| 16 Bytes | ✅ Globally collision-free | **Optimal** (Monotonically time-sorted) | **Low**: High 48 bits encode UNIX timestamp; low bits random. |
+| **`UUID v4` (Random)** | 16 Bytes | ✅ Very low collision probability | Lower locality (random inserts)| Opaque; still requires authorization. |
+| **`UUID v7` / `ULID` (Time-Sorted)**| 16 Bytes | ✅ Very low collision probability | Good time locality (not globally monotonic) | **Low**: High 48 bits encode UNIX timestamp; low bits random. |
 
-> **Senior Recommendation:** Use **UUID v7** for modern distributed microservices and PostgreSQL 17+. You get distributed uniqueness without sacrificing B-Tree index cache locality.
+> **Design choice:** Compare BIGINT and UUIDs against distribution, storage and ordering requirements. UUID v7 improves time locality relative to v4; verify generation support in the selected database/library version. Enforce uniqueness and authorization independently.
 
 ---
 
@@ -83,7 +83,7 @@ ON audit_logs (organization_id, status, created_at DESC);
 2. **Range / Inequality columns next** (`created_at`).
 3. **Sort columns last** (if not already handled by range).
 
-### 2. Partial Indexes (Save 80%+ RAM)
+### 2. Partial Indexes (Savings Depend on Selected Rows)
 Only index rows that are actually queried:
 ```sql
 -- Index ONLY active documents, ignoring 10 million soft-deleted rows!

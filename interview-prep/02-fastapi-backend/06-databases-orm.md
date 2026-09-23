@@ -17,9 +17,9 @@ Cross-References: [04-fastapi-core.md](./04-fastapi-core.md) | [08-vector-databa
 
 ### The Composite Index Leftmost Prefix Rule
 If you create an index on `(organization_id, created_at, status)`:
-- `WHERE organization_id = 5` ➔ **USES INDEX** (prefix matches)
-- `WHERE organization_id = 5 AND created_at > '2026-01-01'` ➔ **USES INDEX**
-- `WHERE created_at > '2026-01-01'` ➔ **INDEX CANNOT BE USED** (Leftmost column omitted, triggers full table scan!)
+- `WHERE organization_id = 5` ➔ **INDEX CANDIDATE** (prefix matches; planner decides)
+- `WHERE organization_id = 5 AND created_at > '2026-01-01'` ➔ **INDEX CANDIDATE**
+- `WHERE created_at > '2026-01-01'` ➔ **LESS SELECTIVE PREFIX**: the planner may still use an index scan or eligible skip scan; check the actual plan.
 
 ---
 
@@ -27,7 +27,7 @@ If you create an index on `(organization_id, created_at, status)`:
 
 | Isolation Level | Dirty Read | Non-Repeatable Read | Phantom Read | Notes |
 |---|---|---|---|---|
-| **Read Uncommitted** | Possible | Possible | Possible | Reads dirty uncommitted rows |
+| **Read Uncommitted** | Prevented in PostgreSQL | Possible | Possible | PostgreSQL treats this as Read Committed |
 | **Read Committed** (Postgres default) | **Prevented** | Possible | Possible | Only reads committed data; subsequent reads inside same TX can see changed values |
 | **Repeatable Read** | **Prevented** | **Prevented** | Prevented in Postgres (MVCC snapshot) | Snapshot taken at first query; sees same data across entire transaction |
 | **Serializable** | **Prevented** | **Prevented** | **Prevented** | Strict serial execution simulation; throws concurrency errors on conflicts |
@@ -93,7 +93,7 @@ engine = create_async_engine(
 AsyncSessionLocal = async_sessionmaker(
     bind=engine,
     class_=AsyncSession,
-    expire_on_commit=False  # CRUCIAL: Prevents lazy-loading attributes after commit!
+    expire_on_commit=False  # Avoids post-commit expiration; does not eagerly load relationships!
 )
 ```
 

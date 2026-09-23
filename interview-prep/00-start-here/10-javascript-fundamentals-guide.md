@@ -1,171 +1,86 @@
-# JavaScript Fundamentals Quick Guide (Start Here)
+# JavaScript concepts — output, reason, follow-up
 
-Even for a React role, interviewers test raw JavaScript. These are the questions that come up again and again. Know them cold — they're easy points.
+[Roadmap](../README.md) · Next: [React](03-react-nextjs-quick-guide.md)
 
-Format: **concept → plain explanation → what you say → follow-up.**
+## 1. Scope, hoisting, closures
 
----
-
-## 1. `var` vs `let` vs `const`
-
-- **`var`:** function-scoped, hoisted, can be redeclared. Avoid it.
-- **`let`:** block-scoped, can be reassigned.
-- **`const`:** block-scoped, can't be reassigned (but objects/arrays it points to can still be mutated).
-
-**Interview answer:** "I use `const` by default and `let` when I need to reassign. I avoid `var` because it's function-scoped and hoisted, which causes surprises. Note `const` doesn't make objects immutable — it just stops reassigning the variable."
-
----
-
-## 2. `==` vs `===`
-
-- `==` compares with type coercion (`0 == "0"` is `true`).
-- `===` compares value **and** type (`0 === "0"` is `false`).
-
-**Interview answer:** "I always use `===` to avoid surprising coercion. `==` converts types before comparing, which leads to bugs like `0 == ''` being true."
-
----
-
-## 3. Closures (asked constantly)
-
-**Plain explanation:** A closure is a function that "remembers" the variables from where it was created, even after that outer function has finished. The inner function keeps access to the outer scope.
+`var` function-scoped; `let`/`const` block-scoped. `let`/`const` declaration se pehle temporal dead zone mein hote hain. `const` binding reassign nahi hoti, object properties phir bhi mutate ho sakti hain.
 
 ```js
-function makeCounter() {
-  let count = 0;              // captured by the closure
-  return function () {
-    count += 1;
-    return count;
-  };
+function counter() {
+  let n = 0;
+  return () => ++n;
 }
-const counter = makeCounter();
-counter(); // 1
-counter(); // 2  <- remembers count
+const a = counter();
+console.log(a(), a()); // 1 2
 ```
 
-**Interview answer:** "A closure is a function bundled with the variables from its surrounding scope. It keeps those variables alive after the outer function returns. It's how things like private counters, memoization, and React hooks work under the hood."
+Closure lexical environment access preserve karta hai. React event/timer closure specific render ki values capture karti hai; stale closure ko dependencies/updater strategy se fix karte hain.
 
-**Follow-up (the classic loop bug):**
+## 2. Event loop output (browser example)
+
 ```js
-// With var, all logs print 3 (shared variable)
-for (var i = 0; i < 3; i++) setTimeout(() => console.log(i), 0);
-// With let, each iteration gets its own i -> logs 0,1,2
-for (let i = 0; i < 3; i++) setTimeout(() => console.log(i), 0);
+console.log('A');
+setTimeout(() => console.log('B'), 0);
+Promise.resolve().then(() => console.log('C'));
+console.log('D');
+// A D C B
 ```
-"`var` shares one variable across iterations, so the callbacks all see the final value. `let` creates a fresh binding per iteration."
 
----
+Synchronous stack pehle finish; microtasks then drain; timer task baad mein eligible hota hai. `0` ms immediate execution guarantee nahi. Long synchronous task UI block karta hai; recursive microtasks tasks/render ko starve kar sakti hain. Browser aur Node scheduling details identical assume mat karo. [MDN execution model](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Execution_model).
 
-## 4. Hoisting
+```mermaid
+flowchart LR
+    A[Run synchronous task] --> B[Drain microtasks]
+    B --> C[Browser may render]
+    C --> D[Next eligible task]
+    D --> B
+```
 
-**Plain explanation:** JavaScript moves declarations to the top of their scope before running. `var` and function declarations are hoisted; `let`/`const` are hoisted but not initialized (the "temporal dead zone"), so using them early throws.
+## 3. Promises aur async errors
 
-**Interview answer:** "Declarations are hoisted to the top of their scope. Function declarations are fully hoisted so you can call them before they appear. `let` and `const` are hoisted but not usable until their line runs — accessing them earlier throws a ReferenceError."
-
----
-
-## 5. `this` (the tricky one)
-
-**Plain explanation:** `this` depends on **how a function is called**, not where it's defined.
-- Regular function: `this` is whatever called it (or `undefined`/window if called plainly).
-- Method on an object: `this` is that object.
-- Arrow function: has **no own `this`** — it uses `this` from where it was defined. This is why arrow functions are handy in callbacks.
-
-**Interview answer:** "`this` is set by the call site for regular functions. Arrow functions don't have their own `this` — they inherit it from the enclosing scope, which is why I use arrows for callbacks so `this` stays predictable."
-
----
-
-## 6. Promises and `async/await`
-
-**Plain explanation:** A Promise represents a value that will exist later — pending, then fulfilled or rejected. `async/await` is nicer syntax over promises.
+`async` function Promise return karta hai. `await` current async flow pause karta hai, whole browser thread nahi. `Promise.all` independent operations concurrently await karta hai; first rejection par reject, remaining work automatically cancel nahi hota. `allSettled` sab outcomes deta hai.
 
 ```js
-// Promise style
-fetch("/api").then(res => res.json()).then(data => ...).catch(err => ...);
-
-// async/await style (same thing, cleaner)
-async function load() {
-  try {
-    const res = await fetch("/api");
-    const data = await res.json();
-  } catch (err) {
-    // handle error
-  }
+async function load(url, signal) {
+  const response = await fetch(url, { signal });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return response.json();
 }
 ```
 
-**Interview answer:** "A promise is an eventual value. `async/await` lets me write asynchronous code that reads top-to-bottom, with `try/catch` for errors, instead of chaining `.then()`."
+`fetch` HTTP 404/500 par automatically reject nahi karta. AbortController cancellation request de sakta hai; remote side effect undo nahi karta. Sequential dependent requests mein `await` correct; independent requests unnecessarily serial mat karo.
 
-**Follow-up:** *"`Promise.all` vs `Promise.race`?"* → `Promise.all` waits for all to resolve (fails if any rejects); `Promise.race` settles with whichever finishes first. Use `Promise.all` to run independent calls in parallel.
+## 4. `this`, prototypes aur equality
 
----
+Regular function ka `this` call-site se aata hai; arrow enclosing lexical `this` use karta hai. Method detach karne par receiver lose ho sakta hai; bind/wrapper required ho sakta hai. Prototype chain property lookup enable karti hai; class syntax us model par built hai.
 
-## 7. The event loop (short version)
+`===` type coercion avoid karta hai; objects identity se compare. `Object.is(NaN, NaN)` true aur `Object.is(0, -0)` false. Spread shallow copy hai; nested data shared reh sakta hai. `structuredClone` many structured values clone karta hai, functions/DOM nodes jaise cases support nahi karta.
 
-**Plain explanation:** JavaScript is single-threaded. Synchronous code runs first. Async callbacks wait in queues: **microtasks** (promises) run before **macrotasks** (setTimeout) after each chunk of sync code.
-
-```js
-console.log(1);
-setTimeout(() => console.log(2), 0);   // macrotask
-Promise.resolve().then(() => console.log(3)); // microtask
-console.log(4);
-// Order: 1, 4, 3, 2
-```
-
-**Interview answer:** "JS runs on one thread with an event loop. After the current synchronous code finishes, it drains all microtasks (promise callbacks) before the next macrotask (like a timer). That's why a resolved promise logs before a `setTimeout(…, 0)`."
-
----
-
-## 8. Array methods (be fluent)
-
-```js
-arr.map(x => x * 2)          // transform -> new array
-arr.filter(x => x > 2)       // keep matching -> new array
-arr.reduce((a, x) => a + x, 0) // fold into one value
-arr.find(x => x.id === 1)    // first match
-arr.some(x => x > 2)         // any match? -> boolean
-arr.every(x => x > 2)        // all match? -> boolean
-arr.forEach(x => ...)        // side effects, no return
-```
-
-**Interview note:** `map`/`filter`/`reduce` return new arrays (don't mutate) — that's why they fit React's immutable state model.
-
----
-
-## 9. Debounce and throttle (very common practical question)
-
-**Plain explanation:**
-- **Debounce:** wait until the user stops doing something, then run once. (Search-as-you-type: run after they stop typing.)
-- **Throttle:** run at most once every N ms. (Scroll/resize handlers.)
+## 5. Debounce vs throttle (write this)
 
 ```js
 function debounce(fn, delay) {
   let timer;
-  return (...args) => {
+  function debounced(...args) {
     clearTimeout(timer);
-    timer = setTimeout(() => fn(...args), delay);
-  };
+    timer = setTimeout(() => fn.apply(this, args), delay);
+  }
+  debounced.cancel = () => clearTimeout(timer);
+  return debounced;
 }
 ```
 
-**Interview answer:** "Debounce delays running until activity stops — good for search input. Throttle limits how often something runs — good for scroll events. Both prevent expensive work from firing too often."
+Debounce pause ke baad run: search. Throttle bounded frequency: scroll updates. React render mein new debouncer har baar banaya toh timers/state buggy ho sakte hain; stable lifecycle + cleanup chahiye.
 
----
+## 6. Coding follow-ups
 
-## 10. Shallow vs deep copy
+- `map` new result array; `forEach` return values collect nahi karta.
+- `forEach(async ...)` promises await nahi karta; `for...of` sequential ya `Promise.all(items.map(...))` concurrent use karo, bounded input ke saath.
+- Destructuring default only `undefined` ke liye, `null` ke liye nahi.
+- `x ?? fallback` sirf nullish values; `x || fallback` zero/empty string bhi replace karta hai.
+- Event delegation parent par listener lagata hai; `target` vs `currentTarget`, bubbling/capture explain karo.
 
-```js
-const shallow = { ...obj };            // nested objects still shared
-const deep = structuredClone(obj);     // fully independent copy
-```
+**Self-test:** above loop output, closure counter, cancellable debounce aur failed fetch handling bina notes likho.
 
-**Interview answer:** "A spread or `Object.assign` is a shallow copy — nested objects are still shared references. For a fully independent copy I use `structuredClone`. This matters in React because I must not mutate nested state."
-
----
-
-## Quick self-test
-1. Explain a closure and the `var`-in-a-loop bug.
-2. Why does a resolved promise log before `setTimeout(…, 0)`?
-3. How does `this` differ in a regular vs arrow function?
-4. `Promise.all` vs `Promise.race`?
-5. Debounce vs throttle — when each?
-6. Shallow vs deep copy, and why it matters in React?
+Depth: [JS question bank](../questions-bank/10-javascript-and-event-loop-questions.md), [optional deep dive](../advanced-optional/30-javascript-core-and-event-loop-deep-dive.md).

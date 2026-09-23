@@ -16,7 +16,7 @@ Interviewers love asking how React renders under the hood. Most junior developer
 ┌──────────────────────────────────────────────┐   ┌────────────────────────┐
 │ 1. Trigger: State/Prop change                │   │ 4. DOM Mutation        │
 │ 2. Fiber Tree: Linked list of units of work  │──►│    Applies diffs to    │
-│ 3. Cooperative Scheduling (requestIdleCallback) │    real browser DOM     │
+│ 3. Cooperative Scheduling (React scheduler) │    real browser DOM     │
 │    Can PAUSE, ABORT, or REUSE work based on  │   │ 5. Runs useLayoutEffect│
 │    priority (User input > Animation > Data)  │   │ 6. Runs useEffect      │
 └──────────────────────────────────────────────┘   └────────────────────────┘
@@ -63,7 +63,7 @@ function Counter() {
 ```
 
 #### 2. `useEffect` vs. `useLayoutEffect`
-- **`useEffect`**: Runs **asynchronously after the browser paints**. It does not block UI rendering. (Use for data fetching, event subscriptions, logging).
+- **`useEffect`**: Runs after commit; often after paint, but interaction-related effects may run before paint. Long effect work can still block the main thread. (Use for data fetching, event subscriptions, logging).
 - **`useLayoutEffect`**: Runs **synchronously after DOM mutation but before the browser paints**. (Use only for measuring DOM layout like scroll positions or element dimensions to prevent visual flickers).
 
 #### 3. `useCallback` vs. `useMemo`

@@ -1,113 +1,66 @@
-# Python / FastAPI + React Interview Prep
+# Interview roadmap — full-stack FastAPI + React
 
-**Who this is for:** A developer with ~2.5 years of experience (strong React / Next.js, plus ~6 months of Python / FastAPI) preparing for **mid-size product companies in Bangalore, Noida, and Delhi**.
+**Profile:** 2.5 years actual experience; preparation 3-year full-stack expectations ke liye. Concepts Hinglish mein samjho, code independently likho, aur trade-offs defend karo.
 
-**What these interviews actually test at your level:**
-- Solid fundamentals (Python, JavaScript, React, SQL) explained clearly
-- Practical decisions ("why did you pick X over Y") backed by real project experience
-- Clean, working code on a shared editor (CRUD, small features, easy-to-medium DSA)
-- A simple system design you can reason about out loud
-- Behavioral: how you work, communicate, and handle problems
+**All-in-one:** [root master guide](../Fullstack-Master-Interview-Guide.md), 17 reviewed chapters. **Hands-on:** [PostgreSQL lab](../postgres-practice/README.md): tables + INSERTs + 40 queries/solutions + 100k-row indexing + 8 concurrency labs.
 
-**What they usually do NOT test at your level:** CPython bytecode internals, GPU/KV-cache math, wire-protocol byte disassembly, distributed consensus proofs. That material exists here in the **Advanced (Optional)** section, but treat it as stretch reading, not your main study path.
+## Topic map: exactly kahan padhna hai
 
----
+| Priority | Track | Main study guide | Deeper reference |
+|---|---|---|---|
+| P0 | Python | [Python concepts](00-start-here/01-python-quick-guide.md) | [OOP/runtime/async depth](09-deep-dive/08-python-deeper-concepts.md) |
+| P0 | Backend | [FastAPI + HTTP + auth](00-start-here/02-fastapi-quick-guide.md) | [production + ORM](09-deep-dive/05-backend-production-patterns.md) |
+| P0 | Database | [SQL + transactions](00-start-here/04-database-quick-guide.md) | [index internals](09-deep-dive/03-postgres-indexing-internals.md) |
+| P0 | JavaScript | [JS fundamentals](00-start-here/10-javascript-fundamentals-guide.md) | [language depth](09-deep-dive/01-javascript-language.md) |
+| P0 | React | [React concepts](00-start-here/03-react-nextjs-quick-guide.md) | [React/browser depth](09-deep-dive/06-react-browser-engineering.md) |
+| P0 | TypeScript | [TS contracts](00-start-here/11-typescript-guide.md) | [frontend contracts/forms](09-deep-dive/06-react-browser-engineering.md) |
+| P0 | Coding/debugging | [Timed workbook + answer checkpoints](00-start-here/12-scenario-coding-round.md) | [DSA patterns](04-system-design-dsa/12-dsa-essentials.md) |
+| P1 | System design | [Worked task manager + diagrams](00-start-here/05-system-design-quick-guide.md) | [distributed systems/operations](09-deep-dive/07-system-operations-advanced.md) |
+| P1 | Engineering | [Production debugging](09-deep-dive/04-api-production-debugging.md) | [CI/CD + operations](09-deep-dive/07-system-operations-advanced.md) |
+| P0 | Project/behavioral | [Real STAR stories](05-behavioral/13-project-talking-points.md) | [Node → Python pitch](00-start-here/08-node-to-python-pitch.md) |
+| P2 | Next.js / mobile | [Rendering + mobile reference](06-frontend-react/15-nextjs-and-react-native.md) | only relevant JD topics |
+| P2 | GenAI / RAG | [Quick guide](00-start-here/06-rag-genai-quick-guide.md) | [RAG basics](03-rag-vector-genai/07-rag-fundamentals.md) |
+| P2 | Internals | [Advanced index](advanced-optional/README.md) | files 19–30; selected reading |
 
-## 🚦 Start Here
+P0 = pehle ready karo. P1 = core ke baad practical depth. P2 = role-specific. Yeh editorial priorities hain, verified question-frequency statistics nahi. Interview mein exact kya aayega company aur round par depend karta hai.
 
-If you only read one section, read this one. The [`00-start-here/`](./00-start-here/) folder has short, plain-English guides written for your level:
+## Daily routine (2 hours)
 
-- [Python quick guide](./00-start-here/01-python-quick-guide.md)
-- [FastAPI quick guide](./00-start-here/02-fastapi-quick-guide.md)
-- [React & Next.js quick guide](./00-start-here/03-react-nextjs-quick-guide.md)
-- [SQL & database quick guide](./00-start-here/04-database-quick-guide.md)
-- [System design quick guide](./00-start-here/05-system-design-quick-guide.md)
-- [RAG / GenAI quick guide](./00-start-here/06-rag-genai-quick-guide.md)
-- [Practical must-knows](./00-start-here/07-practical-must-knows.md) — Git, REST, HTTP status codes, testing, debugging
-- [Node → Python transition pitch](./00-start-here/08-node-to-python-pitch.md)
-- [State management guide](./00-start-here/09-state-management-guide.md) — Context, useReducer, Zustand, Redux, TanStack Query
-- [JavaScript fundamentals guide](./00-start-here/10-javascript-fundamentals-guide.md) — closures, promises, event loop, `this`
-- [TypeScript guide](./00-start-here/11-typescript-guide.md) — types vs interfaces, generics, utility types
-- [Scenarios & coding-round practice](./00-start-here/12-scenario-coding-round.md) — real prompts with solutions
+25 min concept → 45 min code/query → 20 min aloud Q&A → 20 min previous mistakes → 10 min notes. Reading complete checkbox se zyada useful hai: bina notes explanation + working example + one failure case.
 
-Each guide follows the same simple format: **concept → plain explanation → the answer you say in an interview → what they'll follow up with.**
+## 4-week plan with deliverables
 
----
-
-## 📅 A Realistic 4-Week Plan
-
-You don't need to read everything. Here is a focused path.
-
-| Week | Focus | Files |
+| Days | Focus | Done tab maanoge jab… |
 |---|---|---|
-| **Week 1** | Python + FastAPI core (your newest area) | `00-start-here/01`, `02`; then `01-python-core/01,02,03`; `02-fastapi-backend/04,05,06` |
-| **Week 2** | React / Next.js (your strength) + JS/TS + state management | `00-start-here/03`, `09`, `10`, `11`; `06-frontend-react/14,15,18` |
-| **Week 3** | SQL + System design + DSA + practical must-knows | `00-start-here/04`, `05`, `07`; `07-database-design/16`; `04-system-design-dsa/11,12` |
-| **Week 4** | RAG/GenAI + behavioral + coding-round + mock questions | `00-start-here/06`, `08`, `12`; `05-behavioral/13`; whole `questions-bank/` |
+| 1–3 | Python objects/OOP/async | output questions + generator/decorator + concurrency reasoning |
+| 4–7 | HTTP/FastAPI/auth | CRUD contract, validation, permission, transaction and tests |
+| 8–10 | SQL/schema/indexes | three SQL exercises + EXPLAIN reasoning |
+| 11–12 | transactions/concurrency | stock race + optimistic edit conflict explain |
+| 13–14 | backend/DB mock | timed Round A/C; mistakes corrected |
+| 15–17 | JS/TS | event loop outputs, closure, debounce, typed API states |
+| 18–21 | React | race-safe search, forms, cache, performance debugging |
+| 22–24 | design + deployment | task manager diagram with one failure deep dive |
+| 25–26 | DSA + project stories | two timed problems, two defensible stories |
+| 27–28 | full mocks | scorecard, weakest topics repeat, concise revision |
 
-Advanced files (21–30) are optional. Only open them if an interviewer specifically goes deep, or if you're targeting a company known for hard rounds.
+## Agar interview 7 din mein hai
 
----
+Day 1 Python + FastAPI, day 2 DB/SQL, day 3 JS/TS, day 4 React coding, day 5 auth/debugging/design, day 6 timed full mock + project stories, day 7 weak answers and light revision. Har din 30 min DSA/SQL alternate karo. P2 ko tabhi time do jab JD explicitly maange.
 
-## 🗂️ Full Contents
+## Answer dene ka format
 
-### Core material (study these)
+**Definition → mechanism → small example → trade-off → test/failure case.**
 
-```
-01-python-core/
-├── 01-python-fundamentals.md    # Data types, mutability, decorators, generators, GIL
-├── 02-python-oop.md             # Classes, inheritance, dunder methods, dataclasses
-└── 03-python-async.md           # async/await, event loop, when to use async
+Example: “Index lookup/sort help karta hai; is feed mein user equality aur created_at ordering hai, toh matching composite index evaluate karunga. Writes/storage cost badhegi. EXPLAIN ANALYZE se actual plan aur latency check karunga.”
 
-02-fastapi-backend/
-├── 04-fastapi-core.md           # Routing, Pydantic, Depends(), async vs def
-├── 05-fastapi-advanced.md       # Auth (JWT), WebSockets, streaming, testing, deploy
-└── 06-databases-orm.md          # SQL, indexes, SQLAlchemy, the N+1 problem
+Nahi pata ho toh assumption clearly bolo aur reasoning dikhao. Project ke fictional metrics ya unowned work claim mat karo.
 
-03-rag-vector-genai/
-├── 07-rag-fundamentals.md       # What RAG is, chunking, embeddings, retrieval
-├── 08-vector-databases.md       # Vector search, HNSW, Chroma/Qdrant/Pinecone
-├── 09-rag-advanced.md           # Re-ranking, query rewriting, evaluation
-└── 10-llm-integration.md        # Prompts, function calling, LangChain basics
+## Reference library ka use
 
-04-system-design-dsa/
-├── 11-system-design-basics.md   # REST, caching, queues, designing a simple system
-└── 12-dsa-essentials.md         # Arrays, hashmaps, two pointers, sliding window
+Revised core + [deep-dive index](09-deep-dive/README.md) primary source hain, root master inse automatically build hota hai. Older English reference folders retained hain, but version-specific snippets ko reviewed chapters and official docs ke against check karo. Unreviewed old examples ko production-ready assume mat karo.
 
-05-behavioral/
-└── 13-project-talking-points.md # STAR stories for your real projects
+## Required deep-dive checkpoints
 
-06-frontend-react/
-├── 14-react-core-architecture.md   # How React works, hooks, state management
-├── 15-nextjs-and-react-native.md   # RSC vs SSR, hydration, mobile basics
-└── 18-react-ecosystem-libraries.md # Axios, TanStack Query, React Hook Form
+[Auth and JWT sessions](09-deep-dive/02-auth-jwt-sessions.md) · [API/production debugging](09-deep-dive/04-api-production-debugging.md) · [Coverage and answer checkpoints](09-deep-dive/09-interview-coverage.md). Inhe P1 optional reading nahi, core ke baad essential practical preparation samjho.
 
-07-database-design/
-└── 16-database-design-principles.md # Normalization, keys, indexing, multi-tenancy
-
-08-sdlc-engineering/
-└── 17-sdlc-devops-practices.md   # Git workflow, CI/CD, testing pyramid, security
-
-questions-bank/                   # Rapid-fire Q&A to self-test (read all)
-```
-
-### Advanced (Optional) — stretch material for hard rounds only
-
-```
-advanced-optional/  (files 19–30)
-These cover Staff/FAANG-level internals: CPython VM, PyMalloc, ASGI internals,
-PagedAttention/KV-cache math, GenAI security, Kafka/Saga consensus,
-micro-frontends & RSC wire protocol, FAANG DSA patterns, deep JS/event-loop.
-
-Skip these for a first pass. Come back only if you're specifically asked to
-go deep, or you're interviewing at a company with a reputation for hard rounds.
-```
-
----
-
-## ✅ How to use this repo
-
-1. Start with the `00-start-here/` guide for the topic you're weakest on (probably Python/FastAPI given your background).
-2. When a quick guide references a deeper file, read it only if you want more detail.
-3. Every few days, test yourself with the `questions-bank/`. Say answers out loud.
-4. Keep the `advanced-optional/` material on the shelf until you need it.
+[Review scope and official sources](SOURCES-AND-REVIEW.md) · [Start-here index](00-start-here/README.md) · [Practice workbook](00-start-here/12-scenario-coding-round.md)

@@ -1,154 +1,128 @@
-# Python Quick Guide (Start Here)
+# Python concepts — Hinglish interview guide
 
-Written for a React/JS developer who's newer to Python. Every topic: **concept → plain explanation → what you say in an interview → likely follow-up.**
+[Roadmap](../README.md) · Next: [Backend / FastAPI](02-fastapi-quick-guide.md)
 
-If you know JavaScript well, Python will feel familiar. The syntax is cleaner (no braces, no semicolons, indentation matters) and there's one obvious way to do most things.
+**Priority P0:** Har concept ka output predict karo, phir reason bolo. Python 3.11+ syntax use ki gayi hai; GIL discussion standard GIL-enabled CPython ke liye hai.
 
----
+## 1. Names, mutation aur copying
 
-## 1. Variables and how Python passes them
-
-**Plain explanation:** In Python, a variable is just a name pointing at an object (like a `const` pointing at a value in JS). When you pass a variable to a function, you pass the pointer. If the object is *mutable* (list, dict, set) and you change it inside the function, the caller sees the change. If it's *immutable* (int, str, tuple, bool), you can't change it in place, so the caller is unaffected.
+Variable ek object ka naam hai. Function call mein local parameter bhi same object ko refer karta hai; parameter reassign karne se caller ka naam rebind nahi hota.
 
 ```python
-def change(num, items):
-    num += 10          # int is immutable -> makes a new number, original untouched
-    items.append(100)  # list is mutable -> caller's list changes too
+def change(items):
+    items.append(3)   # shared object mutate hua
+    items = [99]      # sirf local name rebind hua
 
-n = 5
-lst = [1, 2]
-change(n, lst)
-print(n)    # 5
-print(lst)  # [1, 2, 100]
+values = [1, 2]
+change(values)
+print(values)         # [1, 2, 3]
+
+original = [[1], [2]]
+copy = original.copy()
+copy[0].append(9)
+print(original)       # [[1, 9], [2]]: nested objects shared hain
 ```
 
-**Interview answer:** "Python passes references by value. Whether the caller sees a change depends on whether the object is mutable. Lists and dicts are mutable, so in-place changes are visible. Numbers, strings, and tuples are immutable, so reassigning them just makes a new object."
+**Interview mein:** “Python uses object sharing. In-place mutation visible hoti hai; rebinding local hoti hai. Shallow copy outer container copy karti hai.”
 
-**Follow-up:** *"Mutable vs immutable types?"* → Mutable: `list`, `dict`, `set`. Immutable: `int`, `float`, `str`, `tuple`, `bool`, `frozenset`.
+**Follow-up:** Tuple immutable hai, lekin tuple ke andar list mutate ho sakti hai. Har tuple hashable nahi—elements bhi hashable hone chahiye. `==` value equality, `is` identity; `None` check ke liye `is None`.
 
----
-
-## 2. The classic mutable-default-argument bug
-
-**Plain explanation:** A default value like `def f(x=[])` is created **once** when the function is defined, not each time it runs. So the same list gets reused across calls. This is a very common interview trap.
+## 2. Mutable default trap
 
 ```python
-# Buggy
-def add(item, bucket=[]):
-    bucket.append(item)
-    return bucket
-
-add("a")  # ['a']
-add("b")  # ['a', 'b']  <- surprise!
-
-# Fix: use None as a sentinel
-def add(item, bucket=None):
+def add(value, bucket=None):
     if bucket is None:
         bucket = []
-    bucket.append(item)
+    bucket.append(value)
     return bucket
 ```
 
-**Interview answer:** "Default arguments are evaluated once at definition time. If the default is mutable, it's shared across calls. The fix is to default to `None` and create a fresh object inside the function."
+`bucket=[]` default function definition par ek baar create hota hai. `bucket or []` mat use karo agar caller ki empty list ko mutate karna intended hai: woh empty list replace kar dega.
 
----
+## 3. Collections aur complexity
 
-## 3. Lists, dicts, sets, tuples (the JS translation)
-
-| Python | JS equivalent | Note |
+| Type | Kab use karna | Interview detail |
 |---|---|---|
-| `list` `[1,2]` | `Array` | ordered, mutable |
-| `dict` `{"a":1}` | `Object` / `Map` | key-value, mutable |
-| `set` `{1,2}` | `Set` | unique items |
-| `tuple` `(1,2)` | frozen array | ordered, immutable |
+| list | ordered sequence | index O(1), membership O(n), append amortized O(1) |
+| dict | key → value lookup | average O(1), hashable keys, insertion order preserved |
+| set | unique membership | average O(1), order par depend mat karo |
+| tuple | fixed record | immutable container, hashability elements par depend |
 
-**Comprehensions** are Python's version of `.map()`/`.filter()`:
+Dict/set ke O(1) claims average case hain. Large input mein list membership ko repeatedly use karna accidentally O(n²) bana sakta hai.
+
+## 4. Generator vs list
 
 ```python
-nums = [1, 2, 3, 4]
-squares = [n*n for n in nums]              # like nums.map(n => n*n)
-evens   = [n for n in nums if n % 2 == 0]  # like nums.filter(...)
-lookup  = {n: n*n for n in nums}           # dict comprehension
+def squares(limit):
+    for n in range(limit):
+        yield n * n
+
+iterator = squares(3)
+print(list(iterator))  # [0, 1, 4]
+print(list(iterator))  # []: exhausted
 ```
 
----
+Generator lazily values deta hai; poora output ek saath allocate nahi karta. Is example ka auxiliary memory bounded hai, lekin har generator constant-memory nahi hota—retained state aur consumer matter karte hain. `list(generator)` phir full result materialize karega.
 
-## 4. Generators (lazy sequences)
+## 5. Decorators, context managers, exceptions
 
-**Plain explanation:** A normal function returns once. A generator uses `yield` to produce values one at a time, only when asked. Great for large data because you don't hold everything in memory at once. Think of it like a lazy iterator / a stream.
-
-```python
-def read_lines(n):
-    for i in range(n):
-        yield f"line {i}"   # produced on demand
-
-for line in read_lines(3):
-    print(line)
-```
-
-**Interview answer:** "A generator produces values lazily with `yield`, keeping constant memory. I'd use one when streaming or processing large datasets so I don't load everything into memory."
-
----
-
-## 5. Decorators
-
-**Plain explanation:** A decorator is a function that wraps another function to add behavior — like a higher-order component (HOC) in React, but for functions. `@decorator` on top of a function is just `func = decorator(func)`.
+Decorator behavior wrap karta hai; `functools.wraps` metadata preserve karta hai. Async function wrap kar rahe ho toh wrapper ko coroutine await karni hogi. Context manager resource lifetime define karta hai: `with open(...)` file close karta hai even on exception.
 
 ```python
-import functools, time
+from functools import wraps
 
-def timed(func):
-    @functools.wraps(func)          # keeps the original name/docs
+def logged(fn):
+    @wraps(fn)
     def wrapper(*args, **kwargs):
-        start = time.perf_counter()
-        result = func(*args, **kwargs)
-        print(f"{func.__name__} took {time.perf_counter()-start:.3f}s")
-        return result
+        print(f"calling {fn.__name__}")
+        return fn(*args, **kwargs)
     return wrapper
-
-@timed
-def work():
-    time.sleep(0.1)
 ```
 
-**Interview answer:** "A decorator wraps a function to add cross-cutting behavior like logging, timing, or auth, without changing the function itself. FastAPI uses them heavily for routing."
+**Follow-up:** `except Exception` karke silently success mat return karo. Specific exception handle karo, context log karo, unexpected error propagate karo. `finally` cleanup ke liye hai; `finally` mein return exception suppress kar sakta hai.
 
-**Follow-up:** *"Why `functools.wraps`?"* → Without it, the wrapped function loses its real name and docstring, which breaks debugging and tools that inspect it.
+## 6. OOP jo explain kar paana chahiye
 
----
+- Instance attribute per object; mutable class attribute sab instances share kar sakte hain.
+- `@classmethod` ko `cls` milta hai, alternate constructors mein useful. `@staticmethod` ko implicit object/class nahi milta.
+- Inheritance “is-a” relation; composition mein component inject hota hai. Payment service mein gateway inject karna testing easy banata hai.
+- Dataclass internal data container; Pydantic external input validation. Type hints alone runtime checks nahi lagate.
+- `super()` method-resolution order follow karta hai, sirf “direct parent” shortcut nahi.
 
-## 6. The GIL (Global Interpreter Lock)
+## 7. Async, threads, processes
 
-**Plain explanation:** CPython lets only one thread run Python code at a time. So threads don't speed up CPU-heavy work. But for I/O work (network calls, DB, files), the lock is released while waiting, so threads and async DO help.
+```mermaid
+flowchart LR
+    A[Work] --> B{Mostly waiting?}
+    B -->|Yes, async driver| C[async await]
+    B -->|Yes, sync driver| D[Bounded thread pool]
+    B -->|CPU heavy| E[Process worker or native computation]
+```
 
-**Which tool for which job:**
-- **I/O-bound** (API calls, DB queries): use `async`/`await` or threads.
-- **CPU-bound** (heavy math, image processing): use `multiprocessing` (separate processes), or libraries like NumPy that run in C.
+Coroutine cooperative concurrency deti hai. `await` potential suspension point hai; CPU loop ko parallel nahi banata. GIL-enabled CPython mein ek process mein ek thread Python bytecode execute karta hai at a time; I/O aur GIL-releasing native code ke cases alag hain. Optional free-threaded builds exist—interview mein runtime clarify karo.
 
-**Interview answer:** "The GIL means only one thread executes Python bytecode at a time, so multithreading doesn't help CPU-bound work — I'd use multiprocessing for that. But for I/O-bound work the GIL is released while waiting, so async or threads give real concurrency. FastAPI is I/O-bound, so async fits well."
+```python
+import asyncio
 
----
+async def fetch_label(label):
+    await asyncio.sleep(0.01)  # simulated non-blocking I/O
+    return label
 
-## 7. `is` vs `==`
+async def main():
+    async with asyncio.TaskGroup() as group:
+        a = group.create_task(fetch_label("A"))
+        b = group.create_task(fetch_label("B"))
+    return [a.result(), b.result()]
+```
 
-- `==` compares **values** (like `===` on values in JS).
-- `is` compares **identity** (same object in memory).
-- Use `is` only for `None`, `True`, `False`: `if x is None:`.
+`TaskGroup` ordinary child failure par siblings cancel karke completion wait karta hai; cleanup phir bhi tumhari responsibility hai. Default `gather` first exception propagate karta hai, siblings automatically cancel nahi karta. Unbounded tasks DB pool overwhelm kar sakte hain; concurrency limit aur timeout lagao. [Python task documentation](https://docs.python.org/3/library/asyncio-task.html).
 
----
+## Self-test (bina notes)
 
-## 8. Memory & garbage collection (light version)
+1. Shallow copy example ka output aur fix explain karo.
+2. `def f(cache={})` bug reproduce karo.
+3. Generator consume hone ke baad kya hota hai?
+4. API call aur image resize ke concurrency choices alag kyun?
+5. Class-level list kyun surprising ho sakti hai?
 
-**Plain explanation:** Python frees an object as soon as nothing points to it (reference counting). A separate garbage collector cleans up cycles (A points to B, B points to A). You rarely manage this by hand.
-
-**Interview answer:** "Python uses reference counting for immediate cleanup, plus a cycle collector for reference cycles. In a long-running service, leaks usually come from unbounded caches or global lists that keep growing — not the GC itself."
-
----
-
-## Quick self-test
-1. Why does a mutable default argument cause bugs, and how do you fix it?
-2. When would you use a generator instead of a list?
-3. Does multithreading speed up CPU-bound Python code? Why or why not?
-4. When do you use `is` vs `==`?
-
-Want more depth on any of these? See [`../01-python-core/01-python-fundamentals.md`](../01-python-core/01-python-fundamentals.md).
+Depth: [reviewed OOP/runtime/async chapter](../09-deep-dive/08-python-deeper-concepts.md). Supplementary historical references: [fundamentals](../01-python-core/01-python-fundamentals.md), [OOP](../01-python-core/02-python-oop.md), [async](../01-python-core/03-python-async.md).

@@ -1,185 +1,128 @@
-# Scenarios & Coding-Round Practice (Start Here)
+# Coding rounds + mock interview workbook (Hinglish)
 
-Real prompts that come up in interviews for your level, with solutions and — just as important — **what to say while you solve them**. Practice narrating your thinking; interviewers score how you reason, not just the final code.
+[Roadmap](../README.md) · [DB solutions](04-database-quick-guide.md) · [React race solution](03-react-nextjs-quick-guide.md)
 
----
+Yeh practice prompts hain, kisi employer ke confirmed/recent question list ka claim nahi. Pehle timer lagao, answer baad mein dekho.
 
-## Part A: React practical prompts
+## Round A — FastAPI task API (60 min)
 
-### 1. "Build a search input that doesn't fire a request on every keystroke"
+**Prompt:** authenticated user project tasks create/list/update kar sake. PostgreSQL persistence, Pydantic input, ownership check aur tests explain/implement karo.
 
-**What they're testing:** debouncing, `useEffect` cleanup.
+**Acceptance criteria:**
 
-```tsx
-function Search({ onSearch }: { onSearch: (q: string) => void }) {
-  const [query, setQuery] = useState("");
+- Title whitespace-only reject; reasonable length cap; status allowlist.
+- Create 201, absent resource 404, invalid input 422, unauthorized access policy consistent.
+- Membership authenticated identity se verify, body user_id trust nahi.
+- List stable sort + limit cap; parameterized query/ORM expressions.
+- PATCH only allowed fields; version conflict 409; failed write rollback.
+- Duplicate/concurrent requests ka behavior define.
 
-  useEffect(() => {
-    const timer = setTimeout(() => onSearch(query), 300); // wait for a pause
-    return () => clearTimeout(timer);                       // cancel on next keystroke
-  }, [query, onSearch]);
+**Solution approach:** route → validation/dependencies → permission check → service transaction → ORM → output schema. Schema/session code [backend guide](02-fastapi-quick-guide.md) aur race strategy [DB guide](04-database-quick-guide.md) mein hai.
 
-  return <input value={query} onChange={(e) => setQuery(e.target.value)} />;
-}
-```
+**Tests interviewer ko bolo:** happy path, whitespace title, wrong tenant ID, no membership, missing record, stale version, DB commit failure. In-memory dict prototype ko multi-worker persistent solution mat present karo.
 
-**Say this:** "I debounce by scheduling the search after 300ms and clearing the timer on each new keystroke via the effect cleanup, so it only fires once the user pauses."
+## Round B — React task search (45 min)
 
----
+**Prompt:** search/filter, loading/error/empty states, debounced API, select task, edit title.
 
-### 2. "This component re-renders too much / on every parent render. Fix it."
+**Acceptance criteria:**
 
-**What they're testing:** `React.memo`, `useCallback`, stable references.
+- Old response latest search ko overwrite na kare.
+- Unmount/query change par timer/request cleanup.
+- Fetch non-2xx handled; user ko retry available.
+- Stable keys, labelled input, keyboard usable controls.
+- Save pending/failed/conflict states; rapid duplicate submission handled.
 
-**Say this:** "First I'd confirm the cause — usually the parent passes a new object or function reference every render, breaking the child's shallow comparison. I'd wrap the child in `React.memo`, memoize callbacks with `useCallback`, and memoize expensive derived values with `useMemo`. But I'd only add these where there's a real cost, not everywhere."
+**Solution:** [useSearch example](03-react-nextjs-quick-guide.md) likho; API adapter ko separate rakho; query cache available ho toh equivalent key/cancellation explain karo.
 
----
+**Manual scenarios:** “rea” slow, “react” fast → latest results only; query clear → empty state; 500 → error; screen leave → no obsolete state update. Network tab aur test delayed promises se race verify karo.
 
-### 3. "Fetch and display a list, with loading and error states"
+## Round C — SQL (30 min)
 
-**What they're testing:** async handling, UI states. (Bonus: mention TanStack Query.)
+[Practice schema](04-database-quick-guide.md) use karo. Bina solution dekhe:
 
-```tsx
-function Users() {
-  const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+1. Har user ka paid count including zero (8 min).
+2. Latest order per user with deterministic tie-breaker (8 min).
+3. Users without orders (5 min).
+4. Feed index and cursor query explain karo (9 min).
 
-  useEffect(() => {
-    let active = true;
-    fetch("/api/users")
-      .then((r) => { if (!r.ok) throw new Error("Failed"); return r.json(); })
-      .then((data) => { if (active) setUsers(data); })
-      .catch((e) => { if (active) setError(e.message); })
-      .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; }; // avoid setting state after unmount
-  }, []);
+**Expected results:** paid counts Asha=2/Ravi=0/Neha=0; latest IDs 102/103; no-order user 3; before cursor `(Sep 2, 102)` for user 1 gives 101. Missing row, tied timestamps aur NULL follow-ups discuss karo.
 
-  if (loading) return <p>Loading…</p>;
-  if (error) return <p>Error: {error}</p>;
-  return <ul>{users.map((u) => <li key={u.id}>{u.name}</li>)}</ul>;
-}
-```
+## Round D — DSA (30 min)
 
-**Say this:** "I handle three states — loading, error, success — and guard against setting state after unmount. In a real app I'd use TanStack Query so caching, refetch, and these states come for free."
-
----
-
-### 4. "Why shouldn't you use the array index as a key?"
-
-**Say this:** "Keys help React match items between renders. If the list can reorder, insert, or delete, index keys make React associate the wrong DOM nodes with the wrong data — causing bugs in inputs and animations. I use a stable unique id."
-
----
-
-## Part B: Python / FastAPI practical prompts
-
-### 5. "Write an endpoint that creates a user with validation"
+**Prompt:** longest substring without repeated characters ka length. Start brute force, then optimize.
 
 ```python
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, EmailStr, Field
+def longest_unique(text: str) -> int:
+    last_seen = {}
+    left = best = 0
+    for right, char in enumerate(text):
+        if char in last_seen:
+            left = max(left, last_seen[char] + 1)
+        last_seen[char] = right
+        best = max(best, right - left + 1)
+    return best
 
-app = FastAPI()
-
-class CreateUser(BaseModel):
-    name: str = Field(min_length=1)
-    email: EmailStr
-    age: int = Field(ge=0)
-
-@app.post("/users", status_code=201)
-async def create_user(user: CreateUser):
-    # imagine saving to DB here
-    return {"id": 1, "name": user.name}
+assert longest_unique('') == 0
+assert longest_unique('abba') == 2
+assert longest_unique('abcabcbb') == 3
+assert longest_unique('bbbb') == 1
 ```
 
-**Say this:** "Pydantic validates the body automatically — invalid input returns a 422 before my code runs. I return 201 for a successful create."
+**Explanation:** window unique rakho; old duplicate agar current window ke bahar hai toh left backward nahi move hona chahiye, isliye `max`. Average O(n) time, O(min(n, alphabet)) space. Python string code points count karta hai, grapheme clusters nahi.
 
----
+Next patterns: hashmap/two sum, stack/balanced brackets, intervals/merge, binary search, BFS/DFS basics. [DSA reference](../04-system-design-dsa/12-dsa-essentials.md).
 
-### 6. "This endpoint is slow. How do you investigate?"
+## Round E — full-stack debugging (20 min)
 
-**Say this:** "I'd first find where the time goes — is it the database, an external API, or computation? For the DB I'd check the query with `EXPLAIN`, look for a missing index or an N+1 pattern where we query in a loop. Common fixes: add an index, batch the queries with a join or eager loading, or cache the result in Redis if it's read-often and changes rarely."
+**“Save successful, refresh par old data.”** API response vs persisted row → transaction commit → replica lag → cache invalidation → stale response → environment mismatch. Har hypothesis ke liye evidence name karo.
 
----
+**“Load badhne par latency shoots up.”** Trace DB duration/pool wait, query counts, external API time, CPU/event loop, queue depth. More workers blindly add karne se DB worse ho sakta hai.
 
-### 7. "Fix the N+1 query"
+**“Do users ek dusre ke tasks dekh rahe.”** Resource authorization, tenant context, shared cache keys, stale login cache. Reproduce with two identities; API negative integration test add karo.
 
-```python
-# Problem: 1 query for users, then 1 per user for orders
-users = await get_users()
-for u in users:
-    u.orders = await get_orders(u.id)   # N extra queries
+## 45-minute oral mock + answer checkpoints
 
-# Fix: load related data in one go (SQLAlchemy eager loading)
-from sqlalchemy.orm import selectinload
-users = await session.scalars(
-    select(User).options(selectinload(User.orders))
-)
-```
+| Minutes | Prompt | Strong answer includes |
+|---|---|---|
+| 0–5 | Intro + one real feature | ownership, constraints, outcome |
+| 5–10 | async vs threads? | blocking calls, I/O vs CPU, bounded concurrency |
+| 10–15 | DB transaction vs session? | atomic unit vs ORM lifecycle, commit/rollback |
+| 15–20 | Last stock race? | conditional update/lock, affected rows |
+| 20–25 | React stale result? | closures, response ordering, cleanup |
+| 25–30 | JWT enough for access? | token verification + resource permissions |
+| 30–40 | Task manager design | contracts, DB, failures, measured scale |
+| 40–45 | Incident/story | real evidence, trade-off, learning |
 
-**Say this:** "N+1 is querying once per item in a loop. I fix it with eager loading or a join so it's one or two queries total."
+## 20 rapid questions: pehle answer bolo, phir checkpoint dekho
 
----
+| Question | Minimum checkpoint |
+|---|---|
+| Python mutable default? | definition-time object shared |
+| Shallow copy? | nested references shared |
+| Generator benefit? | lazy production; consumer may materialize |
+| `await` CPU parallelism? | no; cooperative suspension |
+| FastAPI sync helper offload? | only framework-called sync route/dependency automatic |
+| Pydantic vs TS? | runtime validation vs compile-time typing |
+| DI vs middleware? | route resource/requirements vs cross-cutting request concern |
+| 401 vs 403? | authentication vs permission |
+| Idempotent retry? | repeated intended effect; durable dedup scope |
+| N+1? | parent query plus per-parent relation fetch |
+| LEFT JOIN WHERE trap? | null-rejecting predicate removes unmatched rows |
+| Index always faster? | no, selectivity/cost/write overhead |
+| Serializable retries? | abort then entire transaction retry |
+| State setter immediate? | current render snapshot unchanged |
+| Why stable key? | preserve intended component identity |
+| Effect cleanup? | before re-setup and unmount |
+| `useMemo` guarantee? | performance optimization, not semantic storage |
+| Server state? | remote data/cache lifecycle distinct from UI state |
+| RSC vs SSR? | component execution model vs HTML rendering |
+| Outbox solves duplicates? | closes DB/publication gap; duplicates still possible |
 
-## Part C: Easy-to-medium DSA (Python)
+## Scorecard + repair loop
 
-These are the level you'll actually see. Narrate your approach and complexity.
+Har dimension 0–4: correctness, reasoning/trade-offs, implementation, edge cases/tests, communication. 0=no answer; 1=memorized; 2=happy path; 3=correct with follow-ups; 4=independent implementation + limits.
 
-### 8. Two Sum
-```python
-def two_sum(nums, target):
-    seen = {}                       # value -> index
-    for i, n in enumerate(nums):
-        if target - n in seen:
-            return [seen[target - n], i]
-        seen[n] = i
-    return []
-```
-**Say this:** "A hashmap of values I've seen lets me check the complement in O(1), so it's O(n) time instead of the O(n²) brute force."
+Practice target: 15/20 with no zero in correctness or implementation. Yeh self-assessment threshold hai, hiring prediction nahi. Mistake log: date | question | wrong assumption | corrected answer | exercise | retry date. Missed topic next day, 3 days later, 7 days later repeat karo.
 
-### 9. Reverse a string / check a palindrome
-```python
-def is_palindrome(s: str) -> bool:
-    cleaned = [c.lower() for c in s if c.isalnum()]
-    return cleaned == cleaned[::-1]
-```
-
-### 10. Find duplicates
-```python
-def has_duplicate(nums) -> bool:
-    return len(set(nums)) != len(nums)   # a set drops duplicates
-```
-
-### 11. Count word frequency
-```python
-from collections import Counter
-def word_count(text: str):
-    return Counter(text.lower().split())
-```
-
-### 12. FizzBuzz (they still ask it)
-```python
-for i in range(1, 16):
-    if i % 15 == 0: print("FizzBuzz")
-    elif i % 3 == 0: print("Fizz")
-    elif i % 5 == 0: print("Buzz")
-    else: print(i)
-```
-
-**General DSA talking tip:** state the approach first ("I'll use a hashmap to get O(n)"), then code, then mention time/space complexity. That structure alone puts you ahead of most candidates.
-
----
-
-## Part D: Open-ended discussion prompts
-
-- **"How would you design a simple URL shortener?"** → see [`05-system-design-quick-guide.md`](./05-system-design-quick-guide.md).
-- **"How do you secure an API?"** → auth with JWT, validate all input, use HTTPS, rate-limit, never trust the client, hash passwords, keep secrets in env vars.
-- **"How do you handle a feature you've never built before?"** → break it down, check docs/existing patterns, build the smallest working version first, iterate. Honesty about learning is fine.
-- **"How do you make sure your code works?"** → tests for the logic, manual testing of the happy path and edge cases, and code review.
-
----
-
-## How to practice
-1. Cover the solution, try the prompt yourself, then compare.
-2. Say your reasoning **out loud** — that's the actual skill being tested.
-3. For DSA, always end with time and space complexity.
+Behavioral answers mein real project, actual role aur measured outcome hi use karo. [STAR templates](../05-behavioral/13-project-talking-points.md).

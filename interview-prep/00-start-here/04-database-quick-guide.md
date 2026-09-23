@@ -1,149 +1,163 @@
-# SQL & Database Quick Guide (Start Here)
+# Database concepts — SQL, indexes, transactions (Hinglish)
 
-You've used PostgreSQL, so this builds the mental model behind what you've done. Format: **concept → plain explanation → what you say in an interview → likely follow-up.**
+[Roadmap](../README.md) · Next: [System design](05-system-design-quick-guide.md)
 
-Databases come up in almost every backend interview. You don't need to be a DBA — you need to reason clearly about tables, queries, indexes, and transactions.
+**P0:** SQL likhna, data model defend karna, concurrent writes samajhna. Examples PostgreSQL ke hain.
 
----
+## 1. Relational model aur constraints
 
-## 1. SQL basics you must be fluent in
-
-```sql
--- Read
-SELECT name, email FROM users WHERE age > 18 ORDER BY name LIMIT 10;
-
--- Insert
-INSERT INTO users (name, email) VALUES ('Asha', 'asha@x.com');
-
--- Update
-UPDATE users SET age = 25 WHERE id = 1;
-
--- Delete
-DELETE FROM users WHERE id = 1;
+```mermaid
+erDiagram
+    USERS ||--o{ ORDERS : places
+    ORDERS ||--|{ ORDER_ITEMS : contains
+    PRODUCTS ||--o{ ORDER_ITEMS : references
+    USERS { bigint id PK }
+    ORDERS { bigint id PK
+             bigint user_id FK }
+    PRODUCTS { bigint id PK }
+    ORDER_ITEMS { bigint order_id FK
+                  bigint product_id FK
+                  int quantity }
 ```
 
-**Aggregation** (grouping):
+Diagram business rule dikhata hai: submitted order mein at least one item. Sirf foreign keys se “at least one child” enforce nahi hota; transaction/service validation bhi chahiye.
+
+- Primary key row identity; UNIQUE alternate uniqueness; FK referential integrity.
+- `NOT NULL` required value; `CHECK (quantity > 0)` valid domain. PostgreSQL CHECK mein NULL pass ho sakta hai, isliye required columns par NOT NULL bhi.
+- Many-to-many ke liye join table, e.g. `project_members(project_id, user_id)` with composite unique key.
+- App-level “exists?” then insert race-safe nahi. Unique constraint final authority; conflict handle karo.
+
+**Interview answer:** “Normalization repeated facts ko separate tables mein rakhti hai taaki update anomalies avoid hon. Order item ka purchase price historical snapshot hai, current product price se overwrite nahi karunga.”
+
+1NF: repeating groups avoid; 2NF: non-key attributes poore candidate key par depend; 3NF: problematic transitive dependencies remove. Denormalize measured query need ke liye, with update/reconciliation strategy.
+
+## 2. SQL runnable practice schema
+
+Sandbox PostgreSQL database mein run karo:
+
 ```sql
-SELECT country, COUNT(*) AS user_count
-FROM users
-GROUP BY country
-HAVING COUNT(*) > 100;   -- HAVING filters groups; WHERE filters rows
+CREATE TABLE users (
+  id bigint PRIMARY KEY,
+  name text NOT NULL
+);
+CREATE TABLE orders (
+  id bigint PRIMARY KEY,
+  user_id bigint NOT NULL REFERENCES users(id),
+  total_paise bigint NOT NULL CHECK (total_paise >= 0),
+  status text NOT NULL,
+  created_at timestamptz NOT NULL
+);
+INSERT INTO users VALUES (1, 'Asha'), (2, 'Ravi'), (3, 'Neha');
+INSERT INTO orders VALUES
+ (101, 1, 5000, 'paid', '2026-09-01T10:00:00Z'),
+ (102, 1, 7000, 'paid', '2026-09-02T10:00:00Z'),
+ (103, 2, 2000, 'pending', '2026-09-03T10:00:00Z');
 ```
 
-**Interview answer for WHERE vs HAVING:** "`WHERE` filters individual rows before grouping. `HAVING` filters the groups after `GROUP BY`."
-
----
-
-## 2. Joins (the #1 SQL interview topic)
-
-**Plain explanation:** A join combines rows from two tables using a related column.
-
-| Join | Returns |
-|---|---|
-| `INNER JOIN` | Only rows that match in both tables |
-| `LEFT JOIN` | All rows from the left table + matches (NULL if none) |
-| `RIGHT JOIN` | All rows from the right table + matches |
-| `FULL OUTER JOIN` | All rows from both, matched where possible |
+### Q1. Har user ka paid order count, including zero?
 
 ```sql
--- All users and their orders (users with no orders still show, order fields NULL)
-SELECT u.name, o.total
+SELECT u.id, u.name, COUNT(o.id) AS paid_count
 FROM users u
-LEFT JOIN orders o ON o.user_id = u.id;
+LEFT JOIN orders o ON o.user_id = u.id AND o.status = 'paid'
+GROUP BY u.id, u.name
+ORDER BY u.id;
+-- Asha 2, Ravi 0, Neha 0
 ```
 
-**Interview answer:** "INNER JOIN keeps only matching rows. LEFT JOIN keeps every row from the left side even if there's no match. I reach for LEFT JOIN when I want all the primary records regardless of whether related data exists."
+`COUNT(*)` unmatched left row bhi count karega. `WHERE o.status='paid'` left join ke unmatched rows remove kar dega. `WHERE` rows filter karta hai; `HAVING` grouped results.
 
----
-
-## 3. Indexes (why queries are fast or slow)
-
-**Plain explanation:** An index is like the index at the back of a book. Without it, the database reads every row to find matches (a "full table scan"). With it, it jumps straight to the rows. Indexes make reads faster but writes slightly slower (the index must be updated too), and they use disk.
+### Q2. Har user ka latest order?
 
 ```sql
-CREATE INDEX idx_users_email ON users(email);
+WITH ranked AS (
+  SELECT o.*, ROW_NUMBER() OVER (
+    PARTITION BY user_id ORDER BY created_at DESC, id DESC
+  ) AS rn
+  FROM orders o
+)
+SELECT id, user_id, total_paise FROM ranked WHERE rn = 1;
+-- 102 for Asha, 103 for Ravi
 ```
 
-**When to add one:** on columns you frequently filter (`WHERE`), join on, or sort by.
+Window function rows collapse nahi karta; GROUP BY aggregation karta hai. Ties ke liye `ROW_NUMBER`, `RANK`, `DENSE_RANK` ka expected behavior clarify karo. Second distinct salary ke liye DENSE_RANK useful; second row alag question hai.
 
-**Interview answer:** "An index speeds up lookups by avoiding a full table scan, at the cost of extra storage and slightly slower writes. I index columns used in WHERE, JOIN, and ORDER BY. I check a slow query with `EXPLAIN` to see if it's using the index."
-
-**Follow-up:** *"Downside of too many indexes?"* → Every insert/update has to maintain them, so writes get slower and storage grows.
-
----
-
-## 4. Primary keys, foreign keys, constraints
-
-- **Primary key:** uniquely identifies a row (`id`). One per table.
-- **Foreign key:** a column pointing to another table's primary key (`orders.user_id → users.id`). Enforces that the reference is valid.
-- **Unique / NOT NULL / CHECK:** rules the database enforces so bad data can't get in.
-
-**Interview answer:** "Foreign keys enforce referential integrity — you can't create an order for a user that doesn't exist. I let the database enforce constraints rather than relying only on app code."
-
----
-
-## 5. Normalization (organizing tables)
-
-**Plain explanation:** Normalization means splitting data so each fact lives in exactly one place, avoiding duplication. Instead of repeating a customer's address on every order, you store it once in a `customers` table and reference it.
-
-- **1NF:** no repeating groups; each cell holds one value.
-- **2NF/3NF:** every column depends on the key, the whole key, and nothing but the key.
-
-**When to denormalize:** for read-heavy systems you sometimes duplicate data on purpose to avoid expensive joins.
-
-**Interview answer:** "Normalization removes duplication so data stays consistent. I normalize by default, then denormalize selectively when read performance matters more than avoiding duplication."
-
----
-
-## 6. Transactions & ACID
-
-**Plain explanation:** A transaction groups several statements so they all succeed or all fail together. Classic example: transferring money — debit one account and credit another must both happen or neither.
+### Q3. Users with no orders?
 
 ```sql
-BEGIN;
-UPDATE accounts SET balance = balance - 100 WHERE id = 1;
-UPDATE accounts SET balance = balance + 100 WHERE id = 2;
-COMMIT;   -- or ROLLBACK if something failed
+SELECT u.id FROM users u
+WHERE NOT EXISTS (SELECT 1 FROM orders o WHERE o.user_id = u.id);
+-- 3
 ```
 
-**ACID** in one line each:
-- **Atomicity:** all-or-nothing.
-- **Consistency:** the DB moves from one valid state to another.
-- **Isolation:** concurrent transactions don't corrupt each other.
-- **Durability:** once committed, it survives a crash.
+`NULL = NULL` true nahi; `IS NULL` use karo. `NOT IN` subquery mein NULL ho toh result surprising ho sakta hai; NOT EXISTS intent clear karta hai.
 
-**Interview answer:** "A transaction makes several operations atomic — all succeed or all roll back. I use one whenever multiple writes must stay consistent, like updating an order and reducing inventory together."
+## 3. Index design query se start hota hai
 
----
+```sql
+CREATE INDEX orders_user_created_id_idx
+ON orders (user_id, created_at DESC, id DESC);
 
-## 7. SQL vs NoSQL
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT id, total_paise FROM orders
+WHERE user_id = 1
+ORDER BY created_at DESC, id DESC LIMIT 20;
+```
 
-| SQL (PostgreSQL, MySQL) | NoSQL (MongoDB, DynamoDB) |
+Index storage/write cost add karta hai. Small table par sequential scan sensible ho sakta hai. ANALYZE query execute karta hai; writes par casually mat run karo. Plan mein estimated vs actual rows, scan type, sort, buffers aur loop counts dekho.
+
+B-tree leading equality predicates aur next range column generally scan narrow karte hain. Leading column missing hone par index **kabhi use hi nahi hoga** bolna wrong: planner scan ya eligible skip scan choose kar sakta hai. Actual distribution + plan decide karte hain. [PostgreSQL multicolumn indexes](https://www.postgresql.org/docs/current/indexes-multicolumn.html).
+
+**Follow-ups:** `LOWER(email)` lookup ke liye matching expression index consider karo. Partial index selected rows ke liye; covering index extra columns include karta hai, index-only scan visibility conditions par depend karta hai. Foreign key referencing column par PostgreSQL automatically index create nahi karta.
+
+## 4. ACID aur isolation
+
+Atomicity: all-or-nothing. Consistency: declared constraints/invariants preserved. Isolation: concurrent operations ki allowed visibility. Durability: acknowledged commit ki persistence, configured durability assumptions ke andar.
+
+| PostgreSQL level | Kya yaad rakho |
 |---|---|
-| Structured tables, fixed schema | Flexible documents |
-| Strong relationships & joins | Denormalized, few joins |
-| ACID transactions | Often eventual consistency |
-| Great default for most apps | Great for huge scale / flexible shape |
+| Read Committed (default) | each statement fresh committed snapshot |
+| Repeatable Read | stable transaction snapshot; write skew possible |
+| Serializable | committed result serial order jaisa; abort/retry possible |
 
-**Interview answer:** "I default to PostgreSQL because most apps have relationships and benefit from transactions and constraints. I'd consider NoSQL for very large scale or genuinely schema-less data."
+PostgreSQL Read Uncommitted actually Read Committed jaisa behave karta hai; Repeatable Read phantom reads bhi prevent karta hai. Serializable ka matlab transactions literally ek-ek karke execute nahi hoti. Serialization failure par **poori transaction** retry karte hain. [PostgreSQL isolation](https://www.postgresql.org/docs/current/transaction-iso.html).
 
----
+## 5. Last item: two buyers, one stock
 
-## 8. The N+1 query problem (very common in ORM interviews)
+“Pehle SELECT stock, phir Python mein minus, phir UPDATE” race create karta hai.
 
-**Plain explanation:** You fetch a list (1 query), then loop and fetch related data for each item (N more queries). 100 users → 101 queries. Slow.
+```sql
+-- Illustrative: inventory has product_id PK, stock NOT NULL CHECK(stock >= 0).
+UPDATE inventory
+SET stock = stock - 1
+WHERE product_id = 42 AND stock > 0
+RETURNING stock;
+```
 
-**Fix:** fetch related data in one go — a JOIN, or the ORM's eager loading (`selectinload` / `joinedload` in SQLAlchemy).
+One row returned → reserved; zero rows → unavailable/missing. Reservation aur order insert same transaction mein rakho. Alternative: `SELECT ... FOR UPDATE`, validate, update, commit. Transaction short rakho; payment network call ke dauran lock mat pakdo. Multiple locks consistent order mein lo; deadlocks possible hain aur retry policy chahiye.
 
-**Interview answer:** "N+1 is when I load a list and then query the database once per item for related data. I fix it with eager loading or a join so it's one or two queries instead of hundreds."
+Optimistic approach: `UPDATE ... WHERE id=:id AND version=:old_version`, increment version, zero affected rows par conflict. Collaborative task editor ke liye useful.
 
----
+## 6. Pagination, ORM aur migrations
 
-## Quick self-test
-1. INNER JOIN vs LEFT JOIN?
-2. What does an index do, and what's the tradeoff?
-3. Explain a transaction with a real example.
-4. What is the N+1 problem and how do you fix it?
-5. When would you pick NoSQL over PostgreSQL?
+Offset simple hai; large offset work badhata hai aur concurrent changes rows shift kar sakte hain. Cursor deterministic sort key use karta hai:
 
-More detail: [`../02-fastapi-backend/06-databases-orm.md`](../02-fastapi-backend/06-databases-orm.md) and [`../07-database-design/16-database-design-principles.md`](../07-database-design/16-database-design-principles.md).
+```sql
+SELECT * FROM orders
+WHERE user_id = 1
+  AND (created_at, id) < ('2026-09-02T10:00:00Z'::timestamptz, 102)
+ORDER BY created_at DESC, id DESC LIMIT 20;
+-- 101
+```
+
+Cursor fields same filters/sort ke saath bind karo; page size cap aur cursor validation rakho. Cursor automatic snapshot consistency nahi deta.
+
+N+1: parent list + each parent ka separate relation query. Query count measure karo; `selectinload` collection fetch batch kar sakta hai; `joinedload` joins se row duplication ho sakti hai. ORM SQL cost hide nahi karta.
+
+Migration: expand (new nullable column) → compatible code → batched backfill → constraints → old field remove later. Long locks, failed partial rollout aur rollback compatibility discuss karo. Autogenerated migration review karo.
+
+## Self-test
+
+Bina notes three queries likho, index justify karo, aur simultaneous stock purchase ka timeline draw karo. No-orders, ties, NULL aur empty result test karo.
+
+Depth: [reviewed indexing chapter](../09-deep-dive/03-postgres-indexing-internals.md), [SQL practice](../../postgres-practice/README.md). Supplementary historical references: [database design](../07-database-design/16-database-design-principles.md), [SQLAlchemy](../02-fastapi-backend/06-databases-orm.md).

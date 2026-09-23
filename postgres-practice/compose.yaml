@@ -1,0 +1,19 @@
+# Local study database only. Example credentials, not production secrets.
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: interview_practice
+      POSTGRES_USER: practice
+      POSTGRES_PASSWORD: practice_local_only
+    ports:
+      - "127.0.0.1:55432:5432"
+    volumes:
+      - practice_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U practice -d interview_practice"]
+      interval: 3s
+      timeout: 3s
+      retries: 15
+volumes:
+  practice_data:

@@ -1,0 +1,242 @@
+[
+  {
+    "id": 1,
+    "title": "Products with price >= 500, descending price; ties by ID.",
+    "sql": "SELECT id, name, price FROM products WHERE price >= 500 ORDER BY price DESC, id;",
+    "why": "Comparison + ORDER BY. Without ORDER BY output order guaranteed nahi."
+  },
+  {
+    "id": 2,
+    "title": "Customers whose city is missing.",
+    "sql": "SELECT id, name FROM customers WHERE city IS NULL ORDER BY id;",
+    "why": "NULL check IS NULL, = NULL nahi."
+  },
+  {
+    "id": 3,
+    "title": "Distinct known cities in alphabetical order.",
+    "sql": "SELECT DISTINCT city FROM customers WHERE city IS NOT NULL ORDER BY city;",
+    "why": "DISTINCT duplicates remove karta hai; NULL policy explicit."
+  },
+  {
+    "id": 4,
+    "title": "Order count by status.",
+    "sql": "SELECT status, COUNT(*) AS orders FROM orders GROUP BY status ORDER BY status;",
+    "why": "GROUP BY rows collapse karke aggregate banata hai."
+  },
+  {
+    "id": 5,
+    "title": "Every customer and total order count, including zero.",
+    "sql": "SELECT c.id, COUNT(o.id) AS orders FROM customers c LEFT JOIN orders o ON o.customer_id=c.id GROUP BY c.id ORDER BY c.id;",
+    "why": "COUNT(o.id), not COUNT(*): unmatched customer zero."
+  },
+  {
+    "id": 6,
+    "title": "Every customer and paid order count, including zero.",
+    "sql": "SELECT c.id, COUNT(o.id) AS paid_orders FROM customers c LEFT JOIN orders o ON o.customer_id=c.id AND o.status='paid' GROUP BY c.id ORDER BY c.id;",
+    "why": "Right-side filter ON mein unmatched customers preserve karta hai."
+  },
+  {
+    "id": 7,
+    "title": "Customers who have never ordered.",
+    "sql": "SELECT c.id FROM customers c WHERE NOT EXISTS (SELECT 1 FROM orders o WHERE o.customer_id=c.id) ORDER BY c.id;",
+    "why": "NOT EXISTS avoids NULL-sensitive NOT IN trap."
+  },
+  {
+    "id": 8,
+    "title": "Compute total for every order using quantity and purchase unit_price.",
+    "sql": "SELECT order_id, SUM(quantity*unit_price) AS total FROM order_items GROUP BY order_id ORDER BY order_id;",
+    "why": "Historical unit_price, not current products.price."
+  },
+  {
+    "id": 9,
+    "title": "Total paid revenue across all tenants; refunded/pending/cancelled exclude.",
+    "sql": "SELECT SUM(t.total) AS revenue FROM orders o JOIN order_totals t ON t.order_id=o.id WHERE o.status='paid';",
+    "why": "Revenue definition explicit; accounting settlement/refunds separate model ho sakta hai."
+  },
+  {
+    "id": 10,
+    "title": "Paid spend per customer, including zero, ordered by customer ID.",
+    "sql": "SELECT c.id, COALESCE(SUM(t.total),0) AS paid_spend FROM customers c LEFT JOIN orders o ON o.customer_id=c.id AND o.status='paid' LEFT JOIN order_totals t ON t.order_id=o.id GROUP BY c.id ORDER BY c.id;",
+    "why": "Aggregate NULL ko COALESCE; join paid filter safe."
+  },
+  {
+    "id": 11,
+    "title": "Customers with at least two paid orders.",
+    "sql": "SELECT customer_id, COUNT(*) AS paid_orders FROM orders WHERE status='paid' GROUP BY customer_id HAVING COUNT(*)>=2 ORDER BY customer_id;",
+    "why": "WHERE rows first, HAVING groups later."
+  },
+  {
+    "id": 12,
+    "title": "Paid monthly revenue, using UTC month, Jan\u2013Mar 2026.",
+    "sql": "SELECT to_char(date_trunc('month',o.created_at AT TIME ZONE 'UTC'),'YYYY-MM') AS month, SUM(t.total) AS revenue FROM orders o JOIN order_totals t ON t.order_id=o.id WHERE o.status='paid' GROUP BY 1 ORDER BY 1;",
+    "why": "Timezone explicit, so local midnight does not shift grouping."
+  },
+  {
+    "id": 13,
+    "title": "Daily paid revenue Jan 1\u20135 UTC, including days with no orders.",
+    "sql": "WITH days AS (SELECT d::date AS day FROM generate_series('2026-01-01'::timestamp,'2026-01-05'::timestamp,interval '1 day') d), daily AS (SELECT (o.created_at AT TIME ZONE 'UTC')::date AS day, SUM(t.total) AS revenue FROM orders o JOIN order_totals t ON t.order_id=o.id WHERE o.status='paid' GROUP BY 1) SELECT days.day::text, COALESCE(daily.revenue,0) AS revenue FROM days LEFT JOIN daily USING(day) ORDER BY days.day;",
+    "why": "Date spine + LEFT JOIN fills missing days."
+  },
+  {
+    "id": 14,
+    "title": "Latest order per customer; timestamp ties resolved by higher order ID.",
+    "sql": "WITH ranked AS (SELECT id,customer_id,ROW_NUMBER() OVER(PARTITION BY customer_id ORDER BY created_at DESC,id DESC) AS rn FROM orders) SELECT customer_id,id FROM ranked WHERE rn=1 ORDER BY customer_id;",
+    "why": "ROW_NUMBER gives exactly one deterministic winner."
+  },
+  {
+    "id": 15,
+    "title": "Latest paid order per customer using PostgreSQL DISTINCT ON.",
+    "sql": "SELECT DISTINCT ON(customer_id) customer_id,id FROM orders WHERE status='paid' ORDER BY customer_id,created_at DESC,id DESC;",
+    "why": "DISTINCT ON prefix ORDER BY matches grouping, deterministic tie-breaker."
+  },
+  {
+    "id": 16,
+    "title": "All employees at the second-highest distinct salary company-wide.",
+    "sql": "WITH ranked AS (SELECT id,name,salary,DENSE_RANK() OVER(ORDER BY salary DESC) AS r FROM employees) SELECT id,name,salary FROM ranked WHERE r=2 ORDER BY id;",
+    "why": "DENSE_RANK distinct salary, not second physical employee."
+  },
+  {
+    "id": 17,
+    "title": "Employees in top two distinct salary levels of each department, include ties.",
+    "sql": "WITH ranked AS (SELECT id,department_id,salary,DENSE_RANK() OVER(PARTITION BY department_id ORDER BY salary DESC) AS r FROM employees) SELECT department_id,id,salary,r FROM ranked WHERE r<=2 ORDER BY department_id,r,id;",
+    "why": "Ties included, can return >2 employees per department."
+  },
+  {
+    "id": 18,
+    "title": "Employees earning strictly above their department average.",
+    "sql": "SELECT e.id,e.name FROM employees e WHERE e.salary>(SELECT AVG(x.salary) FROM employees x WHERE x.department_id=e.department_id) ORDER BY e.id;",
+    "why": "Correlated subquery; compare window alternative."
+  },
+  {
+    "id": 19,
+    "title": "Every employee and manager name, including top-level employees.",
+    "sql": "SELECT e.id,e.name,m.name AS manager FROM employees e LEFT JOIN employees m ON m.id=e.manager_id ORDER BY e.id;",
+    "why": "Self LEFT JOIN preserves NULL manager."
+  },
+  {
+    "id": 20,
+    "title": "All direct/indirect reports of employee 1 with depth (direct=1).",
+    "sql": "WITH RECURSIVE reports AS (SELECT id,name,1 AS depth FROM employees WHERE manager_id=1 UNION ALL SELECT e.id,e.name,r.depth+1 FROM employees e JOIN reports r ON e.manager_id=r.id) SELECT * FROM reports ORDER BY depth,id;",
+    "why": "Seed hierarchy acyclic hai; uncontrolled real graphs need cycle detection."
+  },
+  {
+    "id": 21,
+    "title": "Employee count per department, including empty Legal.",
+    "sql": "SELECT d.id,d.name,COUNT(e.id) AS employees FROM departments d LEFT JOIN employees e ON e.department_id=d.id GROUP BY d.id,d.name ORDER BY d.id;",
+    "why": "Empty dimension retained."
+  },
+  {
+    "id": 22,
+    "title": "Orders with both a failed and a successful payment attempt.",
+    "sql": "SELECT order_id FROM payments GROUP BY order_id HAVING BOOL_OR(status='failed') AND BOOL_OR(status='succeeded') ORDER BY order_id;",
+    "why": "Multiple attempts allowed; existence condition not raw total."
+  },
+  {
+    "id": 23,
+    "title": "Paid orders with no successful payment row (reconciliation check).",
+    "sql": "SELECT o.id FROM orders o WHERE o.status='paid' AND NOT EXISTS(SELECT 1 FROM payments p WHERE p.order_id=o.id AND p.status='succeeded') ORDER BY o.id;",
+    "why": "Expected empty on clean fixture; introduce missing payment in transaction to test failure."
+  },
+  {
+    "id": 24,
+    "title": "Compare per-order item total and successful payment total without join fanout.",
+    "sql": "WITH paid AS (SELECT order_id,SUM(amount) AS paid_amount FROM payments WHERE status='succeeded' GROUP BY order_id) SELECT o.id,t.total,COALESCE(p.paid_amount,0) AS paid_amount FROM orders o JOIN order_totals t ON t.order_id=o.id LEFT JOIN paid p ON p.order_id=o.id ORDER BY o.id;",
+    "why": "Aggregate child tables separately; raw items \u00d7 payments join overcounts."
+  },
+  {
+    "id": 25,
+    "title": "Customer 1 orders with previous order ID and elapsed days.",
+    "sql": "SELECT id,LAG(id) OVER w AS previous_id,EXTRACT(EPOCH FROM(created_at-LAG(created_at) OVER w))/86400 AS days_since FROM orders WHERE customer_id=1 WINDOW w AS(ORDER BY created_at,id) ORDER BY created_at,id;",
+    "why": "LAG first row NULL; filter before window limits to customer."
+  },
+  {
+    "id": 26,
+    "title": "Running paid revenue over time, tie-break by order ID.",
+    "sql": "SELECT o.id,SUM(t.total) OVER(ORDER BY o.created_at,o.id ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running_revenue FROM orders o JOIN order_totals t ON t.order_id=o.id WHERE o.status='paid' ORDER BY o.created_at,o.id;",
+    "why": "Explicit ROWS frame avoids peer surprises."
+  },
+  {
+    "id": 27,
+    "title": "Rank every customer by paid spend within tenant, including zero.",
+    "sql": "WITH spend AS(SELECT c.tenant_id,c.id,COALESCE(SUM(t.total),0) AS total FROM customers c LEFT JOIN orders o ON o.customer_id=c.id AND o.status='paid' LEFT JOIN order_totals t ON t.order_id=o.id GROUP BY c.tenant_id,c.id) SELECT *,DENSE_RANK() OVER(PARTITION BY tenant_id ORDER BY total DESC) AS rank FROM spend ORDER BY tenant_id,rank,id;",
+    "why": "Aggregate first, rank second; zero spend preserved."
+  },
+  {
+    "id": 28,
+    "title": "Paid revenue by product category.",
+    "sql": "SELECT p.category,SUM(i.quantity*i.unit_price) AS revenue FROM order_items i JOIN products p ON p.id=i.product_id JOIN orders o ON o.id=i.order_id WHERE o.status='paid' GROUP BY p.category ORDER BY p.category;",
+    "why": "Revenue from purchase prices and quantities."
+  },
+  {
+    "id": 29,
+    "title": "Products never present in any order, regardless of order status.",
+    "sql": "SELECT p.id,p.name FROM products p WHERE NOT EXISTS(SELECT 1 FROM order_items i WHERE i.product_id=p.id) ORDER BY p.id;",
+    "why": "Different from never sold in paid orders; question scope matters."
+  },
+  {
+    "id": 30,
+    "title": "Paid revenue by tenant.",
+    "sql": "SELECT o.tenant_id,SUM(t.total) AS revenue FROM orders o JOIN order_totals t ON t.order_id=o.id WHERE o.status='paid' GROUP BY o.tenant_id ORDER BY o.tenant_id;",
+    "why": "Do not group merely by display name; tenant ID boundary."
+  },
+  {
+    "id": 31,
+    "title": "Order IDs placed through mobile using JSONB text extraction.",
+    "sql": "SELECT id FROM orders WHERE metadata->>'channel'='mobile' ORDER BY id;",
+    "why": "-> returns JSONB; ->> text. Match index expression."
+  },
+  {
+    "id": 32,
+    "title": "Paid/mobile orders using JSONB containment.",
+    "sql": "SELECT id FROM orders WHERE status='paid' AND metadata @> '{\"channel\":\"mobile\"}'::jsonb ORDER BY id;",
+    "why": "Containment can use suitable GIN operator class; tiny table may scan."
+  },
+  {
+    "id": 33,
+    "title": "Duplicate customer display names and their counts (not duplicate accounts).",
+    "sql": "SELECT name,COUNT(*) AS count FROM customers GROUP BY name HAVING COUNT(*)>1 ORDER BY name;",
+    "why": "Names are not unique identifiers."
+  },
+  {
+    "id": 34,
+    "title": "Tenant 1 feed: next 3 rows before cursor Feb 2 10:00 UTC / ID 107, newest first.",
+    "sql": "SELECT id FROM orders WHERE tenant_id=1 AND(created_at,id)<('2026-02-02T10:00:00Z'::timestamptz,107) ORDER BY created_at DESC,id DESC LIMIT 3;",
+    "why": "Composite comparison handles same timestamp 106 correctly."
+  },
+  {
+    "id": 35,
+    "title": "Orders >= 2026-02-01 and < 2026-03-01 UTC.",
+    "sql": "SELECT id FROM orders WHERE created_at>='2026-02-01T00:00:00Z' AND created_at<'2026-03-01T00:00:00Z' ORDER BY id;",
+    "why": "Half-open interval includes fractional end-day times without cast on column."
+  },
+  {
+    "id": 36,
+    "title": "Daily distinct active customers from login events (UTC).",
+    "sql": "SELECT(logged_at AT TIME ZONE 'UTC')::date::text AS day,COUNT(DISTINCT customer_id) AS active FROM login_events GROUP BY 1 ORDER BY 1;",
+    "why": "Repeated login same day counts once."
+  },
+  {
+    "id": 37,
+    "title": "Each customer\u2019s longest streak of consecutive UTC login dates.",
+    "sql": "WITH days AS(SELECT DISTINCT customer_id,(logged_at AT TIME ZONE 'UTC')::date AS day FROM login_events), grouped AS(SELECT customer_id,day,day-(ROW_NUMBER() OVER(PARTITION BY customer_id ORDER BY day))::int AS island FROM days), streaks AS(SELECT customer_id,COUNT(*) AS length FROM grouped GROUP BY customer_id,island) SELECT customer_id,MAX(length) AS longest FROM streaks GROUP BY customer_id ORDER BY customer_id;",
+    "why": "Deduplicate dates before gaps-and-islands grouping."
+  },
+  {
+    "id": 38,
+    "title": "Each department\u2019s salary share of total company salary, rounded 2 decimals.",
+    "sql": "SELECT department_id,ROUND(100.0*SUM(salary)/SUM(SUM(salary)) OVER(),2) AS percent FROM employees GROUP BY department_id ORDER BY department_id;",
+    "why": "Aggregate across groups using window; rounding may not sum exactly 100."
+  },
+  {
+    "id": 39,
+    "title": "Customer IDs with any order but no paid orders.",
+    "sql": "SELECT DISTINCT customer_id FROM orders EXCEPT SELECT customer_id FROM orders WHERE status='paid' ORDER BY customer_id;",
+    "why": "Expected empty here; pending-only customer is a useful extra fixture challenge."
+  },
+  {
+    "id": 40,
+    "title": "Compare COUNT(*) vs COUNT(city) and demonstrate NOT IN with NULL.",
+    "sql": "SELECT COUNT(*) AS all_customers,COUNT(city) AS known_city, (SELECT COUNT(*) FROM customers WHERE id NOT IN(SELECT NULL::integer)) AS null_trap_count FROM customers;",
+    "why": "NOT IN(NULL) produces UNKNOWN, so WHERE keeps no rows."
+  }
+]

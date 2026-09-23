@@ -1,26 +1,16 @@
-# Start Here 🚦
+# Start here — Hinglish study order
 
-These are your main study guides — plain English, written for a React/Next.js developer (~2.5 YOE) growing into Python/FastAPI, targeting mid-size companies in Tier-1 Indian cities.
+[Full roadmap + 4-week / 7-day plans](../README.md)
 
-Every guide follows the same format: **concept → plain explanation → the answer you say in an interview → likely follow-up.**
+1. [Python](01-python-quick-guide.md)
+2. [Backend / FastAPI](02-fastapi-quick-guide.md)
+3. [Database / SQL](04-database-quick-guide.md)
+4. [JavaScript](10-javascript-fundamentals-guide.md)
+5. [TypeScript](11-typescript-guide.md)
+6. [React](03-react-nextjs-quick-guide.md)
+7. [System design with diagrams](05-system-design-quick-guide.md)
+8. [Timed coding + mock interviews](12-scenario-coding-round.md)
 
-## Read in this order
+Supporting references: [practical engineering](07-practical-must-knows.md), [state management](09-state-management-guide.md), [honest project pitch](08-node-to-python-pitch.md). [RAG/GenAI](06-rag-genai-quick-guide.md) role-specific optional track hai.
 
-1. [Python quick guide](./01-python-quick-guide.md) — your newest area, start here
-2. [FastAPI quick guide](./02-fastapi-quick-guide.md)
-3. [React & Next.js quick guide](./03-react-nextjs-quick-guide.md) — your strength, polish it
-4. [SQL & database quick guide](./04-database-quick-guide.md)
-5. [System design quick guide](./05-system-design-quick-guide.md)
-6. [RAG / GenAI quick guide](./06-rag-genai-quick-guide.md)
-7. [Practical must-knows](./07-practical-must-knows.md) — Git, REST, HTTP, auth, testing, debugging
-8. [Your story & Node→Python pitch](./08-node-to-python-pitch.md) — how to present yourself
-9. [State management guide](./09-state-management-guide.md) — Context, useReducer, Zustand, Redux, TanStack Query
-10. [JavaScript fundamentals guide](./10-javascript-fundamentals-guide.md) — closures, promises, event loop, `this`, debounce/throttle
-11. [TypeScript guide](./11-typescript-guide.md) — types vs interfaces, generics, utility types, React+TS patterns
-12. [Scenarios & coding-round practice](./12-scenario-coding-round.md) — real prompts with solutions and what to say
-
-## How to use them
-- Read the guide, then say the answers out loud until they feel natural.
-- Do the "Quick self-test" at the bottom of each.
-- Only open the deeper `01`–`18` files when you want more detail on a topic.
-- Leave the `advanced-optional/` files alone unless an interviewer goes deep.
+Har topic: concept samjho → example execute karo → 60-second answer bolo → follow-up solve karo. Main eight guides revised Hinglish path hain; supporting guides older English references hain.

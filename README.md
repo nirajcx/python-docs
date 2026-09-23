@@ -1,26 +1,25 @@
-# Python, FastAPI & React Interview Prep
+# Full-stack interview prep — FastAPI + React, Hinglish mein
 
-A focused, plain-English study kit for a **full-stack developer with ~2.5 years of experience** (strong React / Next.js, plus ~6 months of Python / FastAPI) preparing for **mid-size product companies in Tier-1 Indian cities (Bangalore, Noida, Delhi)**.
+**Start:** [Interview roadmap](interview-prep/README.md) · [Complete master guide](Fullstack-Master-Interview-Guide.md) · [PostgreSQL practice](postgres-practice/README.md). Core concepts → code → follow-up → mock round. Sirf answers yaad karne ke bajaye har topic explain aur implement karo.
 
-The goal here is simple: **solid fundamentals, clear answers, and practical decisions** — the things you actually get asked at this level. Not Staff/FAANG engine internals.
+| Track | Main guide |
+|---|---|
+| Python | [Objects, OOP, async](interview-prep/00-start-here/01-python-quick-guide.md) |
+| Backend | [HTTP, FastAPI, auth, transactions](interview-prep/00-start-here/02-fastapi-quick-guide.md) |
+| Database | [SQL, schema, indexes, concurrency](interview-prep/00-start-here/04-database-quick-guide.md) |
+| JavaScript + TypeScript | [JS](interview-prep/00-start-here/10-javascript-fundamentals-guide.md) · [TS](interview-prep/00-start-here/11-typescript-guide.md) |
+| React | [Rendering, hooks, state, races](interview-prep/00-start-here/03-react-nextjs-quick-guide.md) |
+| System design | [Task manager architecture + diagrams](interview-prep/00-start-here/05-system-design-quick-guide.md) |
+| Practice | [Coding rounds, questions, mock scorecard](interview-prep/00-start-here/12-scenario-coding-round.md) |
 
----
+Primary study path Hinglish mein hai. Existing detailed chapters aur question banks supplementary references hain; GenAI, React Native aur deep internals role ke hisaab se optional hain.
 
-## 📌 What's inside
+## Deep preparation for 3-year interviews
 
-Everything lives in [`/interview-prep/`](./interview-prep/README.md).
+- [JWT stateless vs sessions, refresh, logout](interview-prep/09-deep-dive/02-auth-jwt-sessions.md)
+- [PostgreSQL indexing internals and EXPLAIN](interview-prep/09-deep-dive/03-postgres-indexing-internals.md)
+- [API and production debugging playbook](interview-prep/09-deep-dive/04-api-production-debugging.md)
+- [let/const/var through JS follow-ups](interview-prep/09-deep-dive/01-javascript-language.md)
+- [Full coverage checklist](interview-prep/09-deep-dive/09-interview-coverage.md)
 
-- **`00-start-here/`** — Short, simplified guides per topic. This is your main study path. Each one goes: concept → plain explanation → the answer you say → likely follow-up.
-- **Core files (01–18)** — More detail on Python, FastAPI, React/Next.js, databases, system design, and behavioral prep.
-- **`questions-bank/`** — Rapid-fire Q&A to test yourself.
-- **`advanced-optional/` (21–30)** — Deep internals for hard rounds only. Safe to skip on a first pass.
-
----
-
-## 🎯 Quick Start
-
-1. Open [`/interview-prep/README.md`](./interview-prep/README.md) for the full roadmap and a realistic 4-week plan.
-2. Begin with [`00-start-here/`](./interview-prep/00-start-here/) — start with Python/FastAPI since that's your newest area.
-3. Polish your React/Next.js (your strength) and practice saying answers out loud.
-
-> Tip: You don't need to read everything. Follow the 4-week plan and use the advanced material only if an interviewer goes deep.
+Root master ab reviewed chapters ka synchronized compilation hai: `python3 scripts/build_master_guide.py`. [Source notes and corrections](interview-prep/SOURCES-AND-REVIEW.md) mein evidence aur validation scope hai. Existing PDF, if present, older snapshot hai; regenerate nahi hua.
